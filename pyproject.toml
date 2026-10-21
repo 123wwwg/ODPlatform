@@ -31,7 +31,9 @@ known-first-party = ["od_platform"]
 # Mypy 配置(类型检查)
 # =============================================================================
 [tool.mypy]
-python_version = "3.10"
+# D2 用了 shutil.rmtree(onexc=...) —— 该参数 3.12 起才有(3.14 移除了 onerror),
+# 所以类型检查目标必须提到 3.12,否则 mypy 会按 3.10 的 typeshed 报错。
+python_version = "3.12"
 warn_return_any = true
 warn_unused_ignores = true
 no_implicit_optional = true
