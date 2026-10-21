@@ -79,3 +79,6 @@ temp/
 *.pkl
 *.h5
 *.npz
+
+# 工具元数据(reset/doctor 等元工具的审计日志,本地运行历史)
+.odp-meta/
