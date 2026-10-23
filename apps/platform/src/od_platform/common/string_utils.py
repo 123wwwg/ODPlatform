@@ -4,6 +4,7 @@
 # @Project   : ODPlatform
 # @Function  : 字符串工具——CJK 感知的对齐 / 表格格式化
 
+from collections.abc import Sequence
 
 
 def get_display_width(text: str) -> int:
@@ -71,9 +72,9 @@ def pad_to_width(text: str, width: int, align: str = 'left') -> str:
 
 
 def format_table_row(
-    columns: list[str],
-    widths: list[int],
-    aligns: list[str] | None = None,
+    columns: Sequence[object],
+    widths: Sequence[int],
+    aligns: Sequence[str] | None = None,
 ) -> str:
     """格式化表格一行"""
     if aligns is None:

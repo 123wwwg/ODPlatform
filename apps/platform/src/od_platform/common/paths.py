@@ -79,6 +79,7 @@ PROCESSED_DATA_DIR: Path = DATA_DIR / "processed"  # 派生数据集:含冻结�
 # 【端私有资产】(在 APP_DIR 下,只属于 platform 这个端)
 # ============================================================
 CONFIGS_DIR: Path = APP_DIR / "configs"
+DATASET_CONFIGS_DIR: Path = CONFIGS_DIR / "datasets"  # 数据集 yaml 的家(Ultralytics 约定)
 LOGGING_DIR: Path = APP_DIR / "logging"
 UNIT_TEST_DIR: Path = APP_DIR / "tests"
 
@@ -129,6 +130,7 @@ def get_dirs_to_initialize() -> list[Path]:
         PROCESSED_DATA_DIR,
         # 端私有资产
         CONFIGS_DIR,
+        DATASET_CONFIGS_DIR,
         LOGGING_DIR,
         UNIT_TEST_DIR,
         # 工程基础设施
@@ -210,6 +212,21 @@ def is_protected(path: Path) -> bool:
         if protected_resolved.is_relative_to(path):
             return True
     return False
+
+
+# ============================================================
+# 【D3 增量】按数据集名拼路径
+# ============================================================
+def raw_dataset_root(name: str) -> Path:
+    return RAW_DATA_DIR / name
+
+
+def dataset_processed_dir(name: str) -> Path:
+    return PROCESSED_DATA_DIR / name
+
+
+def dataset_yaml_path(name: str) -> Path:
+    return DATASET_CONFIGS_DIR / f"{name}.yaml"
 
 
 if __name__ == "__main__":
