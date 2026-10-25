@@ -220,7 +220,11 @@ def _delete_one(path: Path, idx: int, total: int, file_count: int, size: int) ->
         logger.info(f"[{idx}/{total}] 删除 {rel} ({size_str}, {file_count} 个文件)")
 
     try:
-        shutil.rmtree(path, onexc=_on_rm_error)
+        # Python 3.12+ 用 onexc;3.11 及以下用 onerror(参数签名兼容,回调第三个参数都是异常信息)
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(path, onexc=_on_rm_error)
+        else:
+            shutil.rmtree(path, onerror=_on_rm_error)
         logger.info(f"[{idx}/{total}] ✅ 已删除: {rel}")
         return None
     except OSError as e:
