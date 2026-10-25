@@ -37,7 +37,7 @@ dependencies = [
     "torch>=2.0.0",
     "ultralytics>=8.0.0",
     "pyyaml>=6.0",
-    "pydantic>=2.0",
+    "pydantic>=2.5,<3",                                # ★ D5: 钉 Pydantic v2 语义
 ]
 
 [project.optional-dependencies]
@@ -58,6 +58,28 @@ odp-init = "od_platform.cli.init_project:initialize_project"
 odp-reset = "od_platform.cli.reset_project:main"
 odp-transform = "od_platform.cli.transform_data:main"
 odp-validate = "od_platform.cli.validate_data:main"
+odp-gen-config = "od_platform.runtime_config.generator:main"     # ★ D5
+odp-train = "od_platform.cli.train_model:main"                  # ★ D6
+odp-infer = "od_platform.cli.infer:main"                        # ★ D7
+
+
+# =============================================================================
+# Pytest 配置 (platform 端单测从这里跑时生效)
+# =============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",      # 拼错的 mark 立刻报错,不再静默不跑
+    "--tb=short",
+]
+filterwarnings = [
+    # 业务代码用 warnings.warn 发的提示,测试里要能捕获
+    "default::UserWarning",
+]
 
 
 # =============================================================================

@@ -11,7 +11,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from od_platform.common import paths
+from od_platform.common import paths, stamp
 from od_platform.common.constants import (
     COVERAGE_HARD_THRESHOLD,
     COVERAGE_SOFT_THRESHOLD,
@@ -23,7 +23,11 @@ from od_platform.common.constants import (
     AnnotationFormat,
     Task,
 )
-from od_platform.common.lineage import SplitManifest
+from od_platform.common.lineage import (
+    TOOL_VERSION,
+    SplitManifest,
+    compute_data_fingerprint,
+)
 from od_platform.common.run_context import RunContext
 from od_platform.data_pipeline.convert.registry import ConvertOptions
 from od_platform.data_pipeline.convert.service import convert_data_to_yolo
@@ -216,6 +220,22 @@ class DatasetPipeline:
                 manifest_ref=manifest_ref,
             )
 
+        # ★ 盖 transform 章: 我(D3)划分了这批数据。
+        #   data_fingerprint 从【我刚建好的 samples】算 —— 一手证据, 不抄任何人。
+        data_fp = compute_data_fingerprint(manifest.samples)
+        stamp.write_stamp(
+            stage_file=stamp.STAMP_TRANSFORM,
+            data_fingerprint=data_fp,
+            run_id=run.run_id,
+            tool_version=TOOL_VERSION,          # odp-transform/0.4
+            payload={
+                "contract_fingerprint": manifest.contract_fingerprint,
+                "manifest_ref": manifest_ref,
+                "n_samples": len(manifest.samples),
+                "created_at": run.created_at,
+            },
+        )
+
         logger.info("数据集 %r 完成: %s", self.dataset, counts)
         return {
             "counts": counts,
@@ -223,4 +243,5 @@ class DatasetPipeline:
             "manifest_path": str(manifest_path),
             "run_dir": str(run.run_dir),
             "contract_fingerprint": manifest.contract_fingerprint,
+            "data_fingerprint": data_fp,
         }
