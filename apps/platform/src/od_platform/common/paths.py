@@ -140,6 +140,8 @@ def get_dirs_to_initialize() -> List[Path]:
         META_LOGGING_DIR,
         # 数据集 yaml 配置(Ultralytics 约定)
         DATASET_CONFIGS_DIR,
+        # 运行配置 yaml(runtime_config 子系统产出,启动即建)
+        RUNTIME_CONFIGS_DIR,
     ]
 
 
@@ -169,6 +171,31 @@ VALIDATION_RUNS_DIR: Path = RUNS_DIR / "data_validation"   # 质检报告的家(
 
 def validation_run_dir(run_id: str) -> Path:
     return VALIDATION_RUNS_DIR / run_id
+
+
+# ============================================================
+# 【运行配置目录】(D5: 描述【跑法】的 yaml)
+#   DATASET_CONFIGS_DIR: 描述【数据】的 yaml (odp-transform 产出)
+#   RUNTIME_CONFIGS_DIR : 描述【跑法】的 yaml (runtime_config 子系统产出)
+# 两类 yaml 物理分目录, 语义不会互相污染.
+# ============================================================
+RUNTIME_CONFIGS_DIR: Path = CONFIGS_DIR / "runtime"
+
+
+def runtime_config_path(name: str) -> Path:
+    """返回某个运行配置文件的路径: <CONFIGS_DIR>/runtime/<name>.yaml
+
+    Args:
+        name: 配置名 (如 "train" / "val" / "infer"), 不带 .yaml 后缀
+
+    Returns:
+        Path 对象 (尚未创建, 调用方自己负责 mkdir)
+
+    用法:
+        train_yaml = runtime_config_path("train")
+        # → <APP_DIR>/configs/runtime/train.yaml
+    """
+    return RUNTIME_CONFIGS_DIR / f"{name}.yaml"
 
 
 # ============================================================
