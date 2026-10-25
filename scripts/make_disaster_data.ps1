@@ -1,4 +1,4 @@
-# 为 reset 验证造测试数据
+﻿# 为 reset 验证造测试数据
 Write-Host "🎬 准备测试现场..."
 
 New-Item -ItemType Directory -Force -Path "data/raw/precious_dataset/images" | Out-Null
