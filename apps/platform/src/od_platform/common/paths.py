@@ -162,6 +162,16 @@ def dataset_yaml_path(name: str) -> Path:
 
 
 # ============================================================
+# 【数据质检运行目录】(D4:报告的家,按需创建,不进 init 清单)
+# ============================================================
+VALIDATION_RUNS_DIR: Path = RUNS_DIR / "data_validation"   # 质检报告的家(按需创建,不进 init 清单)
+
+
+def validation_run_dir(run_id: str) -> Path:
+    return VALIDATION_RUNS_DIR / run_id
+
+
+# ============================================================
 # reset 专用清单(白名单)
 # ============================================================
 def get_dirs_to_reset() -> List[Path]:
