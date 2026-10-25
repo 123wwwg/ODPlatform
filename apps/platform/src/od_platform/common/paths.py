@@ -138,7 +138,27 @@ def get_dirs_to_initialize() -> List[Path]:
         DOCS_DIR,
         # 工具元数据(reset 等元工具的审计日志位置)
         META_LOGGING_DIR,
+        # 数据集 yaml 配置(Ultralytics 约定)
+        DATASET_CONFIGS_DIR,
     ]
+
+
+# ============================================================
+# 【数据集配置目录】(Ultralytics 约定)
+# ============================================================
+DATASET_CONFIGS_DIR: Path = CONFIGS_DIR / "datasets"   # 数据集 yaml 的家(Ultralytics 约定)
+
+
+def raw_dataset_root(name: str) -> Path:
+    return RAW_DATA_DIR / name
+
+
+def dataset_processed_dir(name: str) -> Path:
+    return PROCESSED_DATA_DIR / name
+
+
+def dataset_yaml_path(name: str) -> Path:
+    return DATASET_CONFIGS_DIR / f"{name}.yaml"
 
 
 # ============================================================
