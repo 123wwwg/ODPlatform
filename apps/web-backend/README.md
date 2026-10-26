@@ -8,6 +8,7 @@
 - 原始图片与缺陷标注图上传、预览
 - 缺陷类型筛选、关键字搜索
 - 总记录数、今日记录数、高置信度数量和平均置信度统计
+- 自动展示最新训练任务、mAP、Precision、Recall、类别指标和训练曲线
 - Django 模板页面与后台管理
 - 本地 Vue 3.5.44、Axios 1.20.0，无需 Node 或 CDN
 
@@ -71,6 +72,30 @@ apps/web-backend/
 | GET/PATCH/DELETE | `/api/defect-record/{id}/` | 查询、修改、删除单条记录 |
 | GET | `/api/defect-type/` | 查询缺陷类型 |
 | GET | `/api/stats/` | 查询统计概览 |
+| GET | `/api/model/` | 查询最新模型训练结果 |
+| GET | `/api/model/training-curve/` | 获取训练曲线图片 |
+
+## Rubbish 数据集训练
+
+```powershell
+cd C:\Users\DELL\ODPlatform
+conda activate ODP
+powershell -ExecutionPolicy Bypass -File .\scripts\train_rubbish.ps1
+```
+
+默认执行 1 epoch、416 图像尺寸的 CPU 演示训练。正式训练示例：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\train_rubbish.ps1 `
+  -Epochs 50 -ImageSize 640 -Batch 16 -Device 0
+```
+
+训练完成后刷新 Web 页面，“模型训练”区域会自动读取最新运行现场。
+
+当前仓库中的模型是 CPU 上 1 个 epoch 的演示训练结果，只用于验证完整链路，
+不应作为最终精度模型。正式训练建议使用 GPU，并把 `Epochs` 提高到 50–100。
+原数据的类别名为 `class_0` 到 `class_9`；如果已有真实垃圾类别名称，应在
+`odp-transform` 的 `--classes` 参数和重新生成的 YAML 中使用真实名称。
 
 当前为本地开发演示配置，API 未启用登录鉴权，且 CORS 在 `DEBUG=1` 时允许
 所有来源。部署到生产环境前必须关闭 `DEBUG`、配置鉴权、限制 CORS，并使用

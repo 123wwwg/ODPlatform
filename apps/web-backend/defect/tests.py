@@ -77,3 +77,11 @@ class DefectApiTests(TestCase):
         self.assertEqual(type_response.status_code, 200)
         type_names = {item["type_name"] for item in type_response.data}
         self.assertIn("测试划痕", type_names)
+
+    def test_model_overview_endpoint(self):
+        response = self.client.get("/api/model/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            response.data["status"],
+            {"completed", "training", "not_found"},
+        )

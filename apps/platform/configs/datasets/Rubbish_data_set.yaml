@@ -1,0 +1,36 @@
+path: C:/Users/DELL/ODPlatform/data/processed/Rubbish_data_set
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: class_0
+  1: class_1
+  2: class_2
+  3: class_3
+  4: class_4
+  5: class_5
+  6: class_6
+  7: class_7
+  8: class_8
+  9: class_9
+nc: 10
+odp_meta:
+  schema_version: 1
+  dataset_name: Rubbish_data_set
+  source_format: yolo
+  task: detect
+  tool_version: odp-transform/0.4
+  created_at: '2026-10-26T15:05:57'
+  contract_fingerprint: 8ae24bde71c826f31728a3c886391b10f90ba5e08da20300954af2649e8ff284
+  manifest_path: runs/data_pipeline/20261026-150557/manifest.json
+  split:
+    strategy: stratified_multilabel
+    seed: 42
+    rates:
+      train: 0.8
+      val: 0.1
+      test: 0.1
+    counts:
+      train: 2827
+      val: 363
+      test: 335

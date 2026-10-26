@@ -22,6 +22,14 @@ from od_platform.training.service import train_yolo
 _CLI_SWITCHES = {"config", "no_archive", "skip_validate"}
 
 
+def _parse_batch(value: str) -> int | float:
+    """整数按 batch 大小解析，小数才表示显存占用比例。"""
+    number = float(value)
+    if number.is_integer():
+        return int(number)
+    return number
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """构造解析器。⚠️ 配置字段 default 一律不给(全 None): 默认值唯一真相是 Pydantic 的
     Field(default=...); argparse 再给会永远覆盖 YAML。没传就是 None = 我没表态。"""
@@ -33,7 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--data", default=None, help="数据集引用: 'MRI_PASCAL'/路径")
     p.add_argument("--model", default=None, help="模型引用: 'yolov8n'/'yolov8n.pt'/路径")
     p.add_argument("--epochs", type=int, default=None)
-    p.add_argument("--batch", type=float, default=None, help="int 或 float(<1 表示显存占比)")
+    p.add_argument(
+        "--batch",
+        type=_parse_batch,
+        default=None,
+        help="int 或 float(<1 表示显存占比)",
+    )
     p.add_argument("--imgsz", type=int, default=None)
     p.add_argument("--device", default=None, help="'0'/'0,1'/'cpu'")
     p.add_argument("--experiment-name", dest="experiment_name", default=None,

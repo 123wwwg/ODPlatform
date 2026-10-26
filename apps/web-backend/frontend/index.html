@@ -26,6 +26,10 @@
                 <span class="nav-icon">▦</span>
                 <span>检测台账</span>
             </button>
+            <button class="nav-item" type="button" @click="scrollToModel">
+                <span class="nav-icon">◎</span>
+                <span>模型训练</span>
+            </button>
             <a class="nav-item" href="/defect/list/">
                 <span class="nav-icon">⌁</span>
                 <span>Django 列表</span>
@@ -116,6 +120,118 @@
                 <strong>{{ confidencePercent(stats.average_confidence) }}</strong>
                 <p>全部记录平均值</p>
             </article>
+        </section>
+
+        <section id="model-panel" class="model-card">
+            <div class="model-card-head">
+                <div>
+                    <p class="eyebrow">TRAINING INTELLIGENCE / MODEL CARD</p>
+                    <h2>Rubbish 检测模型</h2>
+                    <p>训练数据、验证指标和最佳权重均从 ODPlatform 的运行现场自动读取。</p>
+                </div>
+                <span
+                    class="model-status"
+                    :class="modelInfo.status"
+                >{{ modelStatusLabel }}</span>
+            </div>
+
+            <div v-if="modelLoading" class="model-loading">
+                <span class="loader"></span>
+                <span>正在读取训练结果...</span>
+            </div>
+            <div v-else-if="modelInfo.status === 'not_found'" class="model-empty">
+                <strong>尚未发现训练记录</strong>
+                <p>完成 `odp-train` 后刷新页面，即可在这里查看训练指标。</p>
+            </div>
+            <template v-else>
+                <div class="model-run-line">
+                    <div>
+                        <span>RUN ID</span>
+                        <b>{{ modelInfo.run_id }}</b>
+                    </div>
+                    <div>
+                        <span>数据集</span>
+                        <b>{{ modelInfo.dataset.name }}</b>
+                    </div>
+                    <div>
+                        <span>训练设备</span>
+                        <b>{{ modelInfo.training.device === "cpu" ? "CPU" : (modelInfo.training.device || "自动") }}</b>
+                    </div>
+                    <div>
+                        <span>最佳权重</span>
+                        <b>{{ modelInfo.weights.archived || modelInfo.weights.run_best || "生成中" }}</b>
+                    </div>
+                </div>
+
+                <div class="model-metrics">
+                    <article>
+                        <span>mAP@50</span>
+                        <strong>{{ metricPercent(modelInfo.metrics.map50) }}</strong>
+                        <i :style="{ width: metricPercent(modelInfo.metrics.map50) }"></i>
+                    </article>
+                    <article>
+                        <span>mAP@50-95</span>
+                        <strong>{{ metricPercent(modelInfo.metrics.map50_95) }}</strong>
+                        <i :style="{ width: metricPercent(modelInfo.metrics.map50_95) }"></i>
+                    </article>
+                    <article>
+                        <span>Precision</span>
+                        <strong>{{ metricPercent(modelInfo.metrics.precision) }}</strong>
+                        <i :style="{ width: metricPercent(modelInfo.metrics.precision) }"></i>
+                    </article>
+                    <article>
+                        <span>Recall</span>
+                        <strong>{{ metricPercent(modelInfo.metrics.recall) }}</strong>
+                        <i :style="{ width: metricPercent(modelInfo.metrics.recall) }"></i>
+                    </article>
+                </div>
+
+                <div class="model-details-grid">
+                    <div class="dataset-summary">
+                        <div class="model-block-title">
+                            <h3>数据与训练配置</h3>
+                            <span v-if="modelInfo.dataset.validation.severity" class="quality-badge">
+                                质检 {{ modelInfo.dataset.validation.severity }}
+                            </span>
+                        </div>
+                        <div class="split-grid">
+                            <div><span>TRAIN</span><b>{{ modelInfo.dataset.splits.train || 0 }}</b></div>
+                            <div><span>VAL</span><b>{{ modelInfo.dataset.splits.val || 0 }}</b></div>
+                            <div><span>TEST</span><b>{{ modelInfo.dataset.splits.test || 0 }}</b></div>
+                            <div><span>CLASSES</span><b>{{ modelInfo.dataset.class_count || 0 }}</b></div>
+                        </div>
+                        <dl class="training-config">
+                            <div><dt>Epochs</dt><dd>{{ modelInfo.training.epochs ?? "—" }}</dd></div>
+                            <div><dt>Image size</dt><dd>{{ modelInfo.training.imgsz ?? "—" }}</dd></div>
+                            <div><dt>Batch</dt><dd>{{ modelInfo.training.batch ?? "—" }}</dd></div>
+                            <div><dt>权重大小</dt><dd>{{ modelInfo.weights.size_mb ? modelInfo.weights.size_mb + " MB" : "训练中" }}</dd></div>
+                        </dl>
+                    </div>
+                    <figure class="training-curve" v-if="modelInfo.curve_url">
+                        <figcaption>训练过程曲线</figcaption>
+                        <img :src="modelInfo.curve_url" alt="YOLO 训练损失与指标曲线">
+                    </figure>
+                    <div class="model-waiting" v-else>
+                        <span class="loader"></span>
+                        <b>训练仍在进行</b>
+                        <p>完成当前 epoch 后，曲线和指标会自动出现。</p>
+                    </div>
+                </div>
+
+                <div class="class-map-panel" v-if="classMetricRows.length">
+                    <div class="model-block-title">
+                        <h3>各类别 mAP@50-95</h3>
+                        <span>{{ classMetricRows.length }} 个类别</span>
+                    </div>
+                    <div class="class-map-list">
+                        <div class="class-map-row" v-for="item in classMetricRows" :key="item.name">
+                            <span>{{ item.name }}</span>
+                            <i><em :style="{ width: metricPercent(item.value) }"></em></i>
+                            <b>{{ metricPercent(item.value) }}</b>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </section>
 
         <section class="content-card">

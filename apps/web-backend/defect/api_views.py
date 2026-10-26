@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from django.db.models import Count, Q
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import filters, permissions, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import DefectRecord, DefectType
+from .model_info import get_model_overview, latest_training_curve
 from .serializers import DefectRecordSerializer, DefectTypeSerializer
 
 
@@ -62,3 +64,16 @@ def dashboard_stats(request):
             "type_counts": list(type_counts),
         }
     )
+
+
+@api_view(["GET"])
+def model_overview(request):
+    return Response(get_model_overview())
+
+
+@api_view(["GET"])
+def training_curve(request):
+    curve = latest_training_curve()
+    if curve is None:
+        return Response({"detail": "暂无训练曲线图。"}, status=404)
+    return FileResponse(curve.open("rb"), content_type="image/png")

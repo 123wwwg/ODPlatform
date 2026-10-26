@@ -25,6 +25,24 @@ createApp({
             average_confidence: 0,
             type_counts: [],
         });
+        const modelLoading = ref(true);
+        const modelInfo = reactive({
+            status: "loading",
+            run_id: "",
+            experiment_name: "",
+            dataset: {
+                name: "—",
+                classes: [],
+                class_count: 0,
+                splits: {},
+                validation: {},
+            },
+            training: {},
+            metrics: {},
+            weights: {},
+            class_map_50_95: {},
+            curve_url: null,
+        });
 
         const loading = ref(true);
         const saving = ref(false);
@@ -71,6 +89,23 @@ createApp({
             return items.filter((item) => item.count > 0).slice(0, 6);
         });
 
+        const modelStatusLabel = computed(() => {
+            const labels = {
+                completed: "训练完成",
+                training: "训练进行中",
+                not_found: "暂无训练记录",
+                loading: "读取中",
+            };
+            return labels[modelInfo.status] || "未知状态";
+        });
+
+        const classMetricRows = computed(() => {
+            return Object.entries(modelInfo.class_map_50_95 || {})
+                .filter(([, value]) => Number.isFinite(Number(value)))
+                .map(([name, value]) => ({ name, value: Number(value) }))
+                .sort((left, right) => right.value - left.value);
+        });
+
         const typePercent = (count) => {
             const maxCount = Math.max(
                 ...typeStats.value.map((item) => Number(item.count) || 0),
@@ -83,6 +118,13 @@ createApp({
             const numericValue = Number(value);
             if (!Number.isFinite(numericValue)) return "0%";
             return `${Math.round(numericValue * 100)}%`;
+        };
+
+        const metricPercent = (value) => {
+            if (value === null || value === undefined) return "—";
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) return "—";
+            return `${Math.round(Math.max(0, Math.min(1, numericValue)) * 100)}%`;
         };
 
         const formatDate = (value, withTime) => {
@@ -132,23 +174,35 @@ createApp({
 
         const loadAll = async () => {
             loading.value = true;
+            modelLoading.value = true;
             try {
-                const [recordResponse, typeResponse, statsResponse] =
+                const [recordResponse, typeResponse, statsResponse, modelResponse] =
                     await Promise.all([
                         axios.get(`${API_BASE}/defect-record/`),
                         axios.get(`${API_BASE}/defect-type/`),
                         axios.get(`${API_BASE}/stats/`),
+                        axios.get(`${API_BASE}/model/`),
                     ]);
                 records.value = recordResponse.data;
                 typeList.value = typeResponse.data;
                 Object.assign(stats, statsResponse.data);
+                Object.assign(modelInfo, modelResponse.data);
                 apiOnline.value = true;
             } catch (error) {
                 apiOnline.value = false;
+                modelInfo.status = "not_found";
                 showToast(getErrorMessage(error), "error");
             } finally {
                 loading.value = false;
+                modelLoading.value = false;
             }
+        };
+
+        const scrollToModel = () => {
+            document.querySelector("#model-panel")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
         };
 
         const releaseObjectUrl = (url) => {
@@ -316,6 +370,10 @@ createApp({
             records,
             typeList,
             stats,
+            modelLoading,
+            modelInfo,
+            modelStatusLabel,
+            classMetricRows,
             loading,
             saving,
             apiOnline,
@@ -325,6 +383,7 @@ createApp({
             typeStats,
             typePercent,
             confidencePercent,
+            metricPercent,
             formatDate,
             thumbStyle,
             formOpen,
@@ -346,6 +405,7 @@ createApp({
             openDetail,
             editFromDetail,
             removeRecord,
+            scrollToModel,
         };
     },
 }).mount("#app");

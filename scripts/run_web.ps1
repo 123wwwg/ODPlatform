@@ -7,11 +7,6 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $webRoot = Join-Path $repoRoot "apps\web-backend"
 
 $candidates = @()
-$currentPython = (Get-Command python -ErrorAction SilentlyContinue).Source
-if ($currentPython) {
-    $candidates += $currentPython
-}
-
 $odpLine = (& conda env list 2>$null | Where-Object { $_ -match "^\s*ODP\s+" } | Select-Object -First 1)
 if ($odpLine -match "([A-Za-z]:\\.+?)\s*$") {
     $odpRoot = $Matches[1].Trim()
@@ -19,6 +14,11 @@ if ($odpLine -match "([A-Za-z]:\\.+?)\s*$") {
     if (Test-Path -LiteralPath $odpPython) {
         $candidates += $odpPython
     }
+}
+
+$currentPython = (Get-Command python -ErrorAction SilentlyContinue).Source
+if ($currentPython) {
+    $candidates += $currentPython
 }
 
 $python = $null
