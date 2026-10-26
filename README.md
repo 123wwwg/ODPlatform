@@ -22,7 +22,7 @@ python -m pip install -e "./apps/platform[dev,desktop]"
 odp-init
 ```
 
-只需要命令行引擎时，可省略 `desktop`：
+只需要命令行引擎时，可以省略 `desktop`：
 
 ```powershell
 python -m pip install -e "./apps/platform[dev]"
