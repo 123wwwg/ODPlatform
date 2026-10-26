@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ODPlatform 工业缺陷检测台账工作台">
+    <title>ODPlatform · 缺陷检测工作台</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div id="app" class="app-shell" v-cloak>
+    <aside class="sidebar">
+        <a class="brand" href="/" aria-label="ODPlatform 首页">
+            <span class="brand-mark">
+                <span class="scan-line"></span>
+                OD
+            </span>
+            <span class="brand-copy">
+                <strong>ODPlatform</strong>
+                <small>缺陷检测工作台</small>
+            </span>
+        </a>
+
+        <nav class="side-nav" aria-label="主导航">
+            <button class="nav-item active" type="button">
+                <span class="nav-icon">▦</span>
+                <span>检测台账</span>
+            </button>
+            <a class="nav-item" href="/defect/list/">
+                <span class="nav-icon">⌁</span>
+                <span>Django 列表</span>
+            </a>
+            <a class="nav-item" href="/admin/">
+                <span class="nav-icon">⚙</span>
+                <span>后台管理</span>
+            </a>
+        </nav>
+
+        <div class="side-summary">
+            <div class="side-summary-head">
+                <span>类型分布</span>
+                <span>{{ stats.total_types || 0 }} 类</span>
+            </div>
+            <div class="type-bars" v-if="typeStats.length">
+                <div class="type-bar" v-for="item in typeStats" :key="item.type_name">
+                    <div class="type-bar-label">
+                        <span>{{ item.type_name }}</span>
+                        <b>{{ item.count }}</b>
+                    </div>
+                    <div class="type-bar-track">
+                        <span :style="{ width: typePercent(item.count) + '%' }"></span>
+                    </div>
+                </div>
+            </div>
+            <p class="side-empty" v-else>暂无类型数据</p>
+        </div>
+
+        <div class="side-footer">
+            <span class="status-dot" :class="{ offline: !apiOnline }"></span>
+            <span>{{ apiOnline ? "Django API 已连接" : "Django API 未连接" }}</span>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <p class="eyebrow">INDUSTRIAL VISION / QUALITY LEDGER</p>
+                <h1>缺陷检测台账</h1>
+                <p class="page-subtitle">管理原始图片、标注结果、置信度与检测设备，形成可追溯的质量数据。</p>
+            </div>
+            <div class="header-actions">
+                <button class="icon-button" type="button" title="刷新数据" @click="loadAll">
+                    <span :class="{ spinning: loading }">↻</span>
+                </button>
+                <button class="primary-button" type="button" @click="openCreate">
+                    <span>＋</span> 新增记录
+                </button>
+            </div>
+        </header>
+
+        <section class="hero-card">
+            <div class="hero-copy">
+                <span class="hero-tag">ODPLATFORM · QUALITY OPS</span>
+                <h2>让每一次缺陷检测都有据可查</h2>
+                <p>记录原始图像、缺陷标注、设备与人员信息；通过统一台账快速筛选、复核与追溯。</p>
+                <button class="hero-action" type="button" @click="openCreate">
+                    开始录入检测记录 <span>→</span>
+                </button>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+                <div class="radar-grid"></div>
+                <div class="scanner-box box-one"><span>scratch · 0.94</span></div>
+                <div class="scanner-box box-two"><span>dent · 0.87</span></div>
+                <div class="radar-core"></div>
+            </div>
+        </section>
+
+        <section class="stats-grid" aria-label="检测数据概览">
+            <article class="stat-card">
+                <div class="stat-head"><span>记录总数</span><span class="stat-icon cyan">▦</span></div>
+                <strong>{{ stats.total_records || 0 }}</strong>
+                <p>已归档检测记录</p>
+            </article>
+            <article class="stat-card">
+                <div class="stat-head"><span>今日新增</span><span class="stat-icon green">＋</span></div>
+                <strong>{{ stats.today_records || 0 }}</strong>
+                <p>今天完成的检测</p>
+            </article>
+            <article class="stat-card">
+                <div class="stat-head"><span>高置信度</span><span class="stat-icon amber">◎</span></div>
+                <strong>{{ stats.high_confidence || 0 }}</strong>
+                <p>置信度 ≥ 0.80</p>
+            </article>
+            <article class="stat-card">
+                <div class="stat-head"><span>平均置信度</span><span class="stat-icon violet">◇</span></div>
+                <strong>{{ confidencePercent(stats.average_confidence) }}</strong>
+                <p>全部记录平均值</p>
+            </article>
+        </section>
+
+        <section class="content-card">
+            <div class="content-head">
+                <div>
+                    <h2>检测记录</h2>
+                    <p>当前显示 {{ filteredRecords.length }} / {{ records.length }} 条</p>
+                </div>
+                <div class="toolbar">
+                    <label class="search-box">
+                        <span>⌕</span>
+                        <input v-model.trim="searchText" type="search" placeholder="搜索人员、设备或备注">
+                    </label>
+                    <select v-model="filterType" class="filter-select" aria-label="按缺陷类型筛选">
+                        <option value="">全部类型</option>
+                        <option v-for="item in typeList" :key="item.id" :value="String(item.id)">
+                            {{ item.type_name }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <div v-if="loading" class="state-panel">
+                <span class="loader"></span>
+                <p>正在加载检测数据...</p>
+            </div>
+            <div v-else-if="filteredRecords.length === 0" class="state-panel empty-state">
+                <div class="empty-illustration">◇</div>
+                <h3>{{ records.length ? "没有符合条件的记录" : "还没有检测记录" }}</h3>
+                <p>{{ records.length ? "调整搜索词或类型筛选后再试。" : "新增第一条缺陷检测记录，开始建立质量台账。" }}</p>
+                <button class="primary-button" type="button" @click="openCreate">＋ 新增记录</button>
+            </div>
+            <div v-else class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>记录</th>
+                        <th>缺陷类型</th>
+                        <th>检测人员 / 设备</th>
+                        <th>置信度</th>
+                        <th>检测时间</th>
+                        <th class="align-right">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr v-for="record in filteredRecords" :key="record.id">
+                        <td>
+                            <button class="record-cell" type="button" @click="openDetail(record)">
+                                <span class="thumb" :style="thumbStyle(record)"></span>
+                                <span>
+                                    <b>#{{ String(record.id).padStart(4, "0") }}</b>
+                                    <small>{{ record.remark || "无备注" }}</small>
+                                </span>
+                            </button>
+                        </td>
+                        <td><span class="type-badge">{{ record.defect_type_name }}</span></td>
+                        <td>
+                            <b class="cell-main">{{ record.detect_person }}</b>
+                            <small class="cell-sub">{{ record.device_id }}</small>
+                        </td>
+                        <td>
+                            <div class="confidence-cell">
+                                <b>{{ confidencePercent(record.confidence) }}</b>
+                                <span class="confidence-track">
+                                    <i :style="{ width: confidencePercent(record.confidence) }"></i>
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <b class="cell-main">{{ formatDate(record.detect_time, false) }}</b>
+                            <small class="cell-sub">{{ formatDate(record.detect_time, true) }}</small>
+                        </td>
+                        <td>
+                            <div class="row-actions">
+                                <button type="button" title="查看详情" @click="openDetail(record)">查看</button>
+                                <button type="button" title="编辑记录" @click="openEdit(record)">编辑</button>
+                                <button class="danger" type="button" title="删除记录" @click="removeRecord(record)">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div v-if="formOpen" class="modal-backdrop" @click.self="closeForm">
+        <section class="modal-card form-modal" role="dialog" aria-modal="true" aria-labelledby="form-title">
+            <header class="modal-head">
+                <div>
+                    <span class="modal-kicker">{{ editingId ? "EDIT RECORD" : "NEW RECORD" }}</span>
+                    <h2 id="form-title">{{ editingId ? "编辑检测记录" : "新增检测记录" }}</h2>
+                </div>
+                <button class="close-button" type="button" @click="closeForm" aria-label="关闭">×</button>
+            </header>
+
+            <form class="record-form" @submit.prevent="submitForm">
+                <div class="form-grid">
+                    <label class="field">
+                        <span>缺陷类型 *</span>
+                        <select v-model="form.defect_type" required>
+                            <option disabled value="">请选择类型</option>
+                            <option v-for="item in typeList" :key="item.id" :value="item.id">
+                                {{ item.type_name }}
+                            </option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>检测人员 *</span>
+                        <input v-model.trim="form.detect_person" maxlength="50" required placeholder="例如：张工">
+                    </label>
+                    <label class="field">
+                        <span>检测设备编号 *</span>
+                        <input v-model.trim="form.device_id" maxlength="50" required placeholder="例如：CAM-A01">
+                    </label>
+                    <label class="field">
+                        <span>置信度 *</span>
+                        <div class="range-field">
+                            <input v-model.number="form.confidence" type="range" min="0" max="1" step="0.01">
+                            <input v-model.number="form.confidence" type="number" min="0" max="1" step="0.01" required>
+                        </div>
+                    </label>
+                    <label class="field field-wide">
+                        <span>备注</span>
+                        <textarea v-model.trim="form.remark" rows="3" placeholder="记录复核结论、处理建议等信息"></textarea>
+                    </label>
+                    <label class="field file-field">
+                        <span>原始图片 {{ editingId ? "（不选则保留原图）" : "*" }}</span>
+                        <input type="file" accept="image/*" @change="onOriginalChange">
+                        <small>支持 JPG、PNG，建议不超过 10 MB</small>
+                    </label>
+                    <label class="field file-field">
+                        <span>缺陷标注图（可选）</span>
+                        <input type="file" accept="image/*" @change="onDefectChange">
+                        <small>可上传模型标注后的结果图</small>
+                    </label>
+                    <div class="image-preview" v-if="previewOriginal">
+                        <span>原图预览</span>
+                        <img :src="previewOriginal" alt="原始图片预览">
+                    </div>
+                    <div class="image-preview" v-if="previewDefect">
+                        <span>标注图预览</span>
+                        <img :src="previewDefect" alt="缺陷标注图预览">
+                    </div>
+                </div>
+                <p class="form-error" v-if="formError">{{ formError }}</p>
+                <footer class="modal-actions">
+                    <button class="secondary-button" type="button" @click="closeForm">取消</button>
+                    <button class="primary-button" type="submit" :disabled="saving">
+                        <span class="loader small" v-if="saving"></span>
+                        {{ saving ? "正在保存..." : editingId ? "保存修改" : "创建记录" }}
+                    </button>
+                </footer>
+            </form>
+        </section>
+    </div>
+
+    <div v-if="detailOpen && detailRecord" class="modal-backdrop" @click.self="detailOpen = false">
+        <section class="modal-card detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+            <header class="modal-head">
+                <div>
+                    <span class="modal-kicker">RECORD #{{ String(detailRecord.id).padStart(4, "0") }}</span>
+                    <h2 id="detail-title">检测记录详情</h2>
+                </div>
+                <button class="close-button" type="button" @click="detailOpen = false" aria-label="关闭">×</button>
+            </header>
+            <div class="detail-meta">
+                <div><span>缺陷类型</span><b class="type-badge">{{ detailRecord.defect_type_name }}</b></div>
+                <div><span>检测人员</span><b>{{ detailRecord.detect_person }}</b></div>
+                <div><span>设备编号</span><b>{{ detailRecord.device_id }}</b></div>
+                <div><span>置信度</span><b>{{ confidencePercent(detailRecord.confidence) }}</b></div>
+                <div><span>检测时间</span><b>{{ formatDate(detailRecord.detect_time, false) }}</b></div>
+                <div><span>备注</span><b>{{ detailRecord.remark || "无" }}</b></div>
+            </div>
+            <div class="detail-images">
+                <figure>
+                    <figcaption>原始图片</figcaption>
+                    <img v-if="detailRecord.original_img_url" :src="detailRecord.original_img_url" alt="原始图片">
+                </figure>
+                <figure v-if="detailRecord.defect_img_url">
+                    <figcaption>缺陷标注图</figcaption>
+                    <img :src="detailRecord.defect_img_url" alt="缺陷标注图">
+                </figure>
+            </div>
+            <footer class="modal-actions">
+                <button class="secondary-button" type="button" @click="detailOpen = false">关闭</button>
+                <button class="primary-button" type="button" @click="editFromDetail">编辑记录</button>
+            </footer>
+        </section>
+    </div>
+
+    <transition name="toast">
+        <div v-if="toast.message" class="toast" :class="toast.type">
+            <span>{{ toast.type === "error" ? "!" : "✓" }}</span>
+            {{ toast.message }}
+        </div>
+    </transition>
+</div>
+
+<noscript>此页面需要启用 JavaScript。</noscript>
+<script src="/assets/vendor/vue.global.prod.js"></script>
+<script src="/assets/vendor/axios.min.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

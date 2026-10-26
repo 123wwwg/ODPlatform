@@ -4,21 +4,39 @@
 
 ## 布局
 
-- `apps/platform/` — 核心引擎（od-platform 包，Python）
-- `apps/web-backend/` — Web 后端服务（占位，V1.1 启动）
-- `apps/desktop/` — 桌面端（占位）
-- `tests/` — 跨端 E2E 测试
-- `data/` — 数据集（raw / processed）
-- `models/` — 模型权重（pretrained / trained）
-- `runs/` — 训练运行现场
-- `docs/architecture/` — 架构决策记录（ADR）
+- `apps/platform/` — 核心引擎与 `od-platform` Python 包
+- `apps/desktop/` — PySide6 桌面推理演示
+- `apps/web-backend/` — Django + DRF + Vue 3 缺陷检测工作台
+- `data/` — 原始数据与处理产物
+- `models/` — 预训练权重与训练产物
+- `runs/` — 数据、训练与推理运行现场
+- `tests/` — 跨端 E2E 测试占位
+- `docs/architecture/` — 架构决策记录
 
-## 快速开始
+## 安装
 
 ```powershell
 conda activate ODP
-pip install -e "./apps/platform[dev]"
+cd C:\Users\DELL\ODPlatform
+python -m pip install -e "./apps/platform[dev,desktop]"
 odp-init
 ```
 
-详见各子项目 README 与 `docs/architecture/ADR-001-monorepo.md`。
+只需要命令行引擎时，可省略 `desktop`：
+
+```powershell
+python -m pip install -e "./apps/platform[dev]"
+```
+
+## 常用命令
+
+```powershell
+odp-transform --dataset <数据集名> --format pascal_voc --task detect
+odp-validate "apps\platform\configs\datasets\<数据集名>.yaml"
+odp-train --data <数据集名> --epochs 10
+odp-infer --source "D:\images\test.jpg" --model "models\pretrained\yolov8n.pt" --no-show
+powershell -ExecutionPolicy Bypass -File .\scripts\run_desktop.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run_web.ps1
+```
+
+完整运行说明见各子项目 README。

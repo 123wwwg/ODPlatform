@@ -38,6 +38,10 @@ Thumbs.db
 # 测试 / 覆盖率
 # ============================================================
 .pytest_cache/
+.pytest-tmp*/
+apps/web-backend/db.sqlite3
+apps/web-backend/media/
+apps/web-backend/staticfiles/
 .coverage
 .coverage.*
 htmlcov/

@@ -25,6 +25,8 @@ from typing import Any
 
 import yaml
 
+from od_platform.common.paths import RUNTIME_CONFIGS_DIR
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,8 +81,8 @@ class PipelineConfig:
 def load_pipeline_config(yaml_path: str | Path | None) -> PipelineConfig:
     """读 infer_pipeline.yaml. None / 文件不存在 → 空配置 + warning, 不抛."""
     if yaml_path is None:
-        # 走默认路径: configs/runtime/infer_pipeline.yaml
-        yaml_path = Path("configs/runtime/infer_pipeline.yaml")
+        # 使用项目路径常量，避免从仓库根启动时找不到 platform 端内配置。
+        yaml_path = RUNTIME_CONFIGS_DIR / "infer_pipeline.yaml"
     else:
         yaml_path = Path(yaml_path)
 

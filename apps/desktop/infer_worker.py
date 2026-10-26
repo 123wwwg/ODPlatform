@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QObject, Signal, Slot
 
 from od_platform.inference import (
     CancelToken,
-    FrameEvent,
     InferHooks,
     InferResult,
     ProgressEvent,
@@ -35,9 +34,9 @@ class InferWorker(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.cancel_token = CancelToken()
-        self._sink = None                                  # 由 main 注入
+        self._sink: Any = None                             # 由 main 注入
 
-    def set_sink(self, sink) -> None:
+    def set_sink(self, sink: Any) -> None:
         """main 线程构造好 sink 后调 (sink 内部的 Signal 必须在主线程构造)."""
         self._sink = sink
 

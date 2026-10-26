@@ -2,18 +2,17 @@
 from __future__ import annotations
 
 import logging
-import numpy as np
 from pathlib import Path
 
+import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 from od_platform.frame_source import SourceType
-from od_platform.inference import OutputSink
 
 logger = logging.getLogger(__name__)
 
 
-class QtSignalSink(QObject, OutputSink):
+class QtSignalSink(QObject):
     """OutputSink → Qt 信号桥.
 
     每帧推理完, 由 _Renderer 线程调 write(...) → 转成 Qt 信号
@@ -29,10 +28,11 @@ class QtSignalSink(QObject, OutputSink):
 
     def __init__(self, parent: QObject | None = None) -> None:
         QObject.__init__(self, parent)
-        OutputSink.__init__(self)
+        self.write_count = 0
 
     # ---- OutputSink 三方法 ----
     def open(self, output_dir: Path, source_type: SourceType) -> None:
+        self.write_count = 0
         logger.info(f"QtSignalSink.open: dir={output_dir}, source_type={source_type}")
 
     def write(self, frame, annotated: np.ndarray) -> None:
