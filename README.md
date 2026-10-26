@@ -6,7 +6,7 @@
 
 - `apps/platform/` — 核心引擎与 `od-platform` Python 包
 - `apps/desktop/` — PySide6 桌面推理演示
-- `apps/web-backend/` — Django + DRF + Vue 3 缺陷检测工作台
+- `apps/web-backend/` — Django + DRF + Vue 3 Web 控制台
 - `data/` — 原始数据与处理产物
 - `models/` — 预训练权重与训练产物
 - `runs/` — 数据、训练与推理运行现场
@@ -38,5 +38,8 @@ odp-infer --source "D:\images\test.jpg" --model "models\pretrained\yolov8n.pt" -
 powershell -ExecutionPolicy Bypass -File .\scripts\run_desktop.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\run_web.ps1
 ```
+
+Web 工作台还包含生活垃圾图片识别模块：上传图片后调用最新训练权重生成
+标注图、目标明细和识别历史。
 
 完整运行说明见各子项目 README。
