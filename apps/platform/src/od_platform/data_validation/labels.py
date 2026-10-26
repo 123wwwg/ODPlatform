@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
 # @FileName  : labels.py
 # @Author    : ODPlatform Team
 # @Project   : ODPlatform
@@ -7,20 +6,22 @@
 """YOLO 标签行解析:全框架唯一权威。
 返回 (box, kind):box=(class_id, [coords]);kind=None 表示合法;box=None 时 kind 指明原因。
 """
+
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+import math
 
 from od_platform.common.constants import Task
 
 KIND_FIELD_COUNT = "field_count_mismatch"
 KIND_PARSE = "parse_error"
 KIND_POLY_FEW = "polygon_too_few_points"
+KIND_NON_FINITE = "non_finite_coordinate"
 
-ParsedBox = Tuple[int, List[float]]
+ParsedBox = tuple[int, list[float]]
 
 
-def parse_label_line(line: str, task_type: str) -> Tuple[Optional[ParsedBox], Optional[str]]:
+def parse_label_line(line: str, task_type: str) -> tuple[ParsedBox | None, str | None]:
     """解析一行 YOLO 标签(调用方先 strip;空行返回 (None, None))。"""
     parts = line.split()
     if not parts:
@@ -39,4 +40,6 @@ def parse_label_line(line: str, task_type: str) -> Tuple[Optional[ParsedBox], Op
         coords = [float(v) for v in parts[1:]]
     except ValueError:
         return None, KIND_PARSE
+    if not all(math.isfinite(value) for value in coords):
+        return None, KIND_NON_FINITE
     return (class_id, coords), None

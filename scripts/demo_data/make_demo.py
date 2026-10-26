@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
 # @FileName  : make_demo.py
 # @Author    : ODPlatform Team
 # @Project   : ODPlatform
@@ -13,6 +12,9 @@
 
 幂等:重跑覆盖同名文件。
 """
+
+from PIL import Image
+
 from od_platform.common.paths import RAW_DATA_DIR
 
 ROOT = RAW_DATA_DIR / "demo"
@@ -23,27 +25,29 @@ ANN.mkdir(parents=True, exist_ok=True)
 
 (ROOT / "classes.txt").write_text("反光衣\nhead\n", encoding="utf-8")  # 故意乱序
 
-XML = ("<annotation><size><width>640</width><height>480</height></size>\n"
-       "{objs}</annotation>\n")
-OBJ = ('  <object><name>{n}</name><bndbox>'
-       "<xmin>{a}</xmin><ymin>{b}</ymin><xmax>{c}</xmax><ymax>{d}</ymax>"
-       "</bndbox></object>\n")
+XML = "<annotation><size><width>640</width><height>480</height></size>\n{objs}</annotation>\n"
+OBJ = (
+    "  <object><name>{n}</name><bndbox>"
+    "<xmin>{a}</xmin><ymin>{b}</ymin><xmax>{c}</xmax><ymax>{d}</ymax>"
+    "</bndbox></object>\n"
+)
 
 for i in range(51):
-    (IMG / f"c_{i:03d}.jpg").write_bytes(b"")          # 空图:全流程不读像素
+    Image.new("RGB", (640, 480), "white").save(IMG / f"c_{i:03d}.jpg")
     objs = OBJ.format(n="head", a=40 + i % 100, b=60, c=160 + i % 100, d=200)
     (ANN / f"c_{i:03d}.xml").write_text(XML.format(objs=objs), encoding="utf-8")
 
 # 埋雷:c_050 的框故意越界(xmax=700>640),留给 D4 的 bbox_within_image 抓
 (ANN / "c_050.xml").write_text(
-    XML.format(objs=OBJ.format(n="head", a=500, b=60, c=700, d=200)),
-    encoding="utf-8")
+    XML.format(objs=OBJ.format(n="head", a=500, b=60, c=700, d=200)), encoding="utf-8"
+)
 
-for i in range(12):                                     # 稀有类:反光衣
+for i in range(12):  # 稀有类:反光衣
     x = 30 + (i * 11) % 260
-    objs = (OBJ.format(n="head", a=40 + i, b=60, c=160 + i, d=200)
-            + OBJ.format(n="反光衣", a=x, b=260, c=x + 100, d=420))
+    objs = OBJ.format(n="head", a=40 + i, b=60, c=160 + i, d=200) + OBJ.format(
+        n="反光衣", a=x, b=260, c=x + 100, d=420
+    )
     (ANN / f"rare_{i:03d}.xml").write_text(XML.format(objs=objs), encoding="utf-8")
-    (IMG / f"rare_{i:03d}.jpg").write_bytes(b"")
+    Image.new("RGB", (640, 480), "white").save(IMG / f"rare_{i:03d}.jpg")
 
 print(f"演示数据就绪: {ROOT}  (63 图 / 75 标注, 其中 12 张含稀有类)")

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
 # @FileName  : service.py
 # @Author    : ODPlatform Team
 # @Project   : ODPlatform
@@ -7,19 +6,30 @@
 """质检服务层:跑全部 check 并聚合。
 唯一的 except Exception 护栏在这里:单 check 崩溃降级为 ERROR 结果,不拖垮整场质检。
 """
+
 from __future__ import annotations
 
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from od_platform.common import paths, stamp
 from od_platform.common.lineage import compute_data_fingerprint
+from od_platform.common.progress import iter_progress, progress_reporting
 from od_platform.data_validation import VALIDATOR_VERSION
 from od_platform.data_validation.checks._lineage import load_manifest_from_yaml
+from od_platform.data_validation.history import (
+    compare_reports,
+    dataset_identity,
+    find_previous_report,
+    read_report,
+)
 from od_platform.data_validation.registry import (
-    CheckContext, CheckEntry, CheckResult, CheckSeverity, get_all_checks,
+    CheckContext,
+    CheckEntry,
+    CheckResult,
+    CheckSeverity,
+    get_all_checks,
 )
 from od_platform.data_validation.report import ValidationReport
 from od_platform.data_validation.snapshot import build_snapshot
@@ -28,33 +38,60 @@ from od_platform.data_validation.snapshot import build_snapshot
 def _safe_run_one(entry: CheckEntry, ctx: CheckContext) -> CheckResult:
     try:
         return entry.func(ctx)
-    except Exception as e:                          # noqa: BLE001 —— 护栏,必须宽
-        return CheckResult(entry.name, CheckSeverity.ERROR,
-                           f"check 自身崩溃: {type(e).__name__}: {e}",
-                           {"exception": repr(e)})
+    except Exception as e:  # noqa: BLE001 —— 护栏,必须宽
+        return CheckResult(
+            entry.name,
+            CheckSeverity.ERROR,
+            f"check 自身崩溃: {type(e).__name__}: {e}",
+            {"exception": repr(e)},
+        )
 
 
-def run_all_checks(ctx: CheckContext) -> List[CheckResult]:
-    return [_safe_run_one(e, ctx) for e in get_all_checks()]
+def run_all_checks(ctx: CheckContext) -> list[CheckResult]:
+    return [_safe_run_one(e, ctx) for e in iter_progress(get_all_checks(), "D4 checks")]
 
 
-def validate_dataset(yaml_path, task_type: Optional[str] = None,
-                     run_id: Optional[str] = None,
-                     write_report: bool = True) -> ValidationReport:
+def validate_dataset(
+    yaml_path,
+    task_type: str | None = None,
+    run_id: str | None = None,
+    write_report: bool = True,
+    *,
+    show_progress: bool = False,
+    compare_to: Path | None = None,
+    compare_previous: bool = True,
+) -> ValidationReport:
     """端到端:快照 → 全量 check → 报告(logger + json/csv)。"""
     t0 = time.perf_counter()
-    run_id = run_id or datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = run_id or datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    if not run_id or run_id in (".", "..") or any(c in run_id for c in "/\\:"):
+        raise ValueError("run_id 必须是单个目录名称")
+    if compare_to is not None and not compare_previous:
+        raise ValueError("compare_to 与 compare_previous=False 不能同时使用")
+    out_dir = paths.validation_run_dir(run_id)
+    if write_report and out_dir.exists():
+        raise ValueError(f"运行目录已存在，拒绝覆盖历史报告: {out_dir}")
     yaml_path = Path(yaml_path)
-    snapshot = build_snapshot(yaml_path, task_type=task_type)
-    results = run_all_checks(CheckContext(yaml_path=yaml_path, snapshot=snapshot))
-    report = ValidationReport(run_id=run_id, snapshot=snapshot, results=results,
-                              duration_seconds=time.perf_counter() - t0)
+    with progress_reporting(show_progress):
+        snapshot = build_snapshot(yaml_path, task_type=task_type)
+        baseline = Path(compare_to) if compare_to is not None else None
+        if baseline is None and compare_previous:
+            baseline = find_previous_report(paths.VALIDATION_RUNS_DIR, dataset_identity(snapshot))
+        previous = read_report(baseline) if baseline is not None else None
+        if previous is not None and previous["dataset"] != dataset_identity(snapshot):
+            raise ValueError("历史报告与本次的 yaml 路径、数据根目录或 task 不一致，无法对比")
+        results = run_all_checks(CheckContext(yaml_path=yaml_path, snapshot=snapshot))
+    report = ValidationReport(
+        run_id=run_id, snapshot=snapshot, results=results, duration_seconds=time.perf_counter() - t0
+    )
+    if previous is not None:
+        report.comparison = compare_reports(previous, report.to_dict(), baseline=baseline)
     report.render_to_logger()
     if write_report:
-        out_dir = paths.validation_run_dir(run_id)
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=False)
         report.write_json(out_dir / "report.json")
         report.write_results_csv(out_dir / "results.csv")
+        report.write_comparison_csv(out_dir / "comparison.csv")
 
     # ★ 盖 validate 章: 我(D4)验过这批数据。仅在【能定位到 manifest】时盖 ——
     #   没有 manifest 的数据集(非 odp-transform 产出)谈不上流转卡, 跳过。

@@ -1,15 +1,19 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
 # @FileName  : test_data_validation.py
 # @Author    : ODPlatform Team
 # @Project   : ODPlatform
 # @Function  : data_validation 回归测试(10 项)
 """data_validation 回归测试:干净集 + 九类脏集,守住 15 项 check 的关键语义。"""
+
 from pathlib import Path
+
+import pytest
 
 from od_platform.data_validation.registry import CheckContext, CheckSeverity, get_check
 from od_platform.data_validation.service import run_all_checks, validate_dataset
 from od_platform.data_validation.snapshot import build_snapshot
+
+pytestmark = pytest.mark.usefixtures("isolated_data_workspace")
 
 
 def _ctx(yaml_path: Path) -> CheckContext:
@@ -26,19 +30,20 @@ def test_clean_dataset_all_pass(demo_yaml):
         if r.name == "bbox_within_image":
             assert r.severity == CheckSeverity.WARNING, r  # c_050 埋雷,留给 D4 抓
         else:
-            assert r.severity in (CheckSeverity.PASS, CheckSeverity.INFO), \
+            assert r.severity in (CheckSeverity.PASS, CheckSeverity.INFO), (
                 f"{r.name}: {r.severity} {r.summary}"
+            )
 
 
 def test_pair_existence_flags_missing(demo_yaml_missing_labels):
     r = _run(demo_yaml_missing_labels, "pair_existence")
-    assert r.severity == CheckSeverity.WARNING       # ≈16%:≥5% 且 <50%
+    assert r.severity == CheckSeverity.WARNING  # ≈16%:≥5% 且 <50%
     assert r.details["missing"] > 0
 
 
 def test_fingerprint_match_flags_swapped_yaml(demo_yaml_wrong_fingerprint):
     r = _run(demo_yaml_wrong_fingerprint, "fingerprint_match")
-    assert r.severity == CheckSeverity.ERROR         # yaml 指纹与 manifest 不一致
+    assert r.severity == CheckSeverity.ERROR  # yaml 指纹与 manifest 不一致
 
 
 def test_manifest_lineage_flags_tampered_label(demo_yaml_tampered_label):
@@ -70,7 +75,7 @@ def test_label_format_and_bbox_do_not_double_report(demo_yaml_bad_field_count):
 
 def test_split_uniqueness_hard_error_on_leak(demo_yaml_leaked_sample):
     r = _run(demo_yaml_leaked_sample, "split_uniqueness")
-    assert r.severity == CheckSeverity.ERROR          # 泄漏没有分级,直接 ERROR
+    assert r.severity == CheckSeverity.ERROR  # 泄漏没有分级,直接 ERROR
 
 
 def test_class_presence_flags_missing_in_train(demo_yaml_class_missing_train):

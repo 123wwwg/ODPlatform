@@ -39,6 +39,7 @@ dependencies = [
     "numpy>=1.26.0",
     "opencv-python>=4.8.0",
     "Pillow>=10.0.0",
+    "tqdm>=4.66.0",
     "pyyaml>=6.0",
     "pydantic>=2.5,<3",     # 钉 Pydantic v2 语义(v1 API 不兼容)
 ]
@@ -47,7 +48,7 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
-    "ruff>=0.1.0",
+    "ruff==0.15.1",
     "mypy>=1.5.0",
     "pre-commit>=3.4.0",
     "types-PyYAML>=6.0.0",
@@ -87,6 +88,12 @@ path = "src/od_platform/_version.py"
 # pytest 配置 (D5 统一; D3/D4 测试一并受益)
 # =============================================================================
 [tool.pytest.ini_options]
+pythonpath      = ["src"]
+markers = [
+    "unit: 单元测试",
+    "integration: 集成测试",
+    "slow: 慢测试 (> 1s)",
+]
 testpaths        = ["tests"]
 python_files     = ["test_*.py"]
 python_classes   = ["Test*"]
