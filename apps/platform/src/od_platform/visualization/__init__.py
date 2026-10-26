@@ -49,6 +49,10 @@ class DrawStyle:
     text_scale: float = 0.6
     text_color: Tuple[int, int, int] = (255, 255, 255)
     text_bg_alpha: float = 0.6
+    # —— 显示内容开关: 演示时常用"只看框"或"只看类别" ——
+    show_label: bool = True          # 是否画类别名
+    show_confidence: bool = True     # 是否在类别名后带置信度
+    show_legend: bool = False        # 是否在右上角画类别图例(色块+名称+数量)
 
     @classmethod
     def from_image_size(
@@ -60,6 +64,9 @@ class DrawStyle:
         text_scale: Optional[float] = None,
         text_color: Optional[Tuple[int, int, int]] = None,
         text_bg_alpha: Optional[float] = None,
+        show_label: Optional[bool] = None,
+        show_confidence: Optional[bool] = None,
+        show_legend: Optional[bool] = None,
     ) -> "DrawStyle":
         """按图像尺寸自适应默认值, 显式传的覆盖."""
         short = min(h, w) or 640
@@ -68,6 +75,9 @@ class DrawStyle:
             text_scale=text_scale or max(0.4, round(short / 900, 2)),
             text_color=text_color or (255, 255, 255),
             text_bg_alpha=text_bg_alpha if text_bg_alpha is not None else 0.6,
+            show_label=True if show_label is None else show_label,
+            show_confidence=True if show_confidence is None else show_confidence,
+            show_legend=False if show_legend is None else show_legend,
         )
         return style
 
@@ -191,8 +201,11 @@ class BeautifyVisualizer:
             cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)),
                           color, style.box_thickness)
 
+            # 只画框不画字: style.show_label=False
+            if not style.show_label:
+                continue
             label = self._display_label(det.label, use_label_mapping)
-            if det.confidence > 0:
+            if style.show_confidence and det.confidence > 0:
                 label = f"{label} {det.confidence:.2f}"
 
             # 标签文字: 有 PIL 字体 → PIL 画 (支持中文); 否则 cv2.putText
@@ -200,7 +213,59 @@ class BeautifyVisualizer:
                 self._draw_label_pil(annotated, label, int(x1), int(y1), color, style)
             else:
                 self._draw_label_cv2(annotated, label, int(x1), int(y1), color, style)
+
+        if style.show_legend and dets:
+            annotated = self.draw_legend(annotated, dets, style=style)
         return annotated
+
+    def draw_legend(
+        self,
+        image,
+        dets: list[Detection],
+        *,
+        style: DrawStyle,
+        max_items: int = 10,
+    ):
+        """右上角画类别图例: 色块 + 名称 + 数量, 按数量降序.
+
+        一张图检出十几个框时, 光看框分不清"总共几种、各几个"; 图例给的是汇总。
+        """
+        import cv2
+        from collections import Counter
+
+        counts = Counter(d.label for d in dets)
+        items = counts.most_common(max_items)
+        h, w = image.shape[:2]
+        pad = 6
+        (_, th), baseline = cv2.getTextSize(
+            "Ag", cv2.FONT_HERSHEY_SIMPLEX, style.text_scale, 1
+        )
+        line_h = th + baseline + pad
+        panel_w = 150
+        panel_h = line_h * (len(items) + (1 if len(counts) > max_items else 0)) + pad * 2
+        x0 = max(0, w - panel_w - 10)
+        y0 = 10
+
+        out = image.copy()
+        overlay = out.copy()
+        cv2.rectangle(overlay, (x0, y0), (x0 + panel_w, y0 + panel_h), (0, 0, 0), -1)
+        alpha = style.text_bg_alpha
+        cv2.addWeighted(overlay, alpha, out, 1 - alpha, 0, out)
+
+        for idx, (name, cnt) in enumerate(items):
+            y = y0 + pad + idx * line_h
+            color = self._box_color(name)
+            cv2.rectangle(out, (x0 + pad, y + 4), (x0 + pad + 12, y + line_h - 4), color, -1)
+            text = self._display_label(name, True)
+            cv2.putText(out, f"{text} x{cnt}", (x0 + pad + 18, y + th),
+                        cv2.FONT_HERSHEY_SIMPLEX, style.text_scale,
+                        (255, 255, 255), 1, cv2.LINE_AA)
+        if len(counts) > max_items:
+            y = y0 + pad + len(items) * line_h
+            cv2.putText(out, f"... {len(counts)} classes", (x0 + pad, y + th),
+                        cv2.FONT_HERSHEY_SIMPLEX, style.text_scale,
+                        (200, 200, 200), 1, cv2.LINE_AA)
+        return out
 
     def _draw_label_cv2(self, annotated, label: str, x: int, y: int,
                         color: Tuple[int, int, int], style: DrawStyle) -> None:

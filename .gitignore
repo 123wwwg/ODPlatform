@@ -70,6 +70,14 @@ models/trained/*/
 runs/*
 !runs/README.md
 
+# 外部数据集压缩包与解压目录(体积大, 不进仓库)
+*.zip
+PhanLoaiRac.v1i.voc/
+waste_dataset/
+
+# Windows 保留设备名, 某些命令会意外生成同名空文件
+NUL
+
 # 端私有日志(运行时产生,各机器不同)
 apps/platform/logging/
 *.log
