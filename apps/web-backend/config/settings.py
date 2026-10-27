@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-import os
 import mimetypes
+import os
+import sys
 from pathlib import Path
 
 mimetypes.add_type("image/webp", ".webp")
 mimetypes.add_type("video/mp4", ".mp4")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+PLATFORM_SRC = BASE_DIR.parent / "platform" / "src"
+if str(PLATFORM_SRC) not in sys.path:
+    sys.path.insert(0, str(PLATFORM_SRC))
 
 SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
@@ -67,30 +71,10 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "UserAttributeSimilarityValidator"
-        )
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
-        )
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "CommonPasswordValidator"
-        )
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "NumericPasswordValidator"
-        )
-    },
+    {"NAME": ("django.contrib.auth.password_validation.UserAttributeSimilarityValidator")},
+    {"NAME": ("django.contrib.auth.password_validation.MinimumLengthValidator")},
+    {"NAME": ("django.contrib.auth.password_validation.CommonPasswordValidator")},
+    {"NAME": ("django.contrib.auth.password_validation.NumericPasswordValidator")},
 ]
 
 LANGUAGE_CODE = "zh-hans"

@@ -9,6 +9,7 @@ on:
       - 'apps/platform/src/od_platform/data_validation/**'
       - 'apps/platform/src/od_platform/cli/*data.py'
       - 'apps/platform/tests/**'
+      - 'apps/web-backend/**'
       - 'scripts/demo_data/**'
       - '**/pyproject.toml'
       - 'requirements-data-dev.txt'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'apps/platform/**'
+      - 'apps/web-backend/**'
       - 'scripts/demo_data/**'
       - 'pyproject.toml'
       - 'requirements-data-dev.txt'
@@ -40,7 +42,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-data-dev.txt
       - name: Install data development tools
-        run: python -m pip install -r requirements-data-dev.txt
+        run: python -m pip install -r requirements-data-dev.txt -r apps/web-backend/requirements.txt
       - name: Run isolated data regression tests
         run: >-
           python -m pytest -c pyproject.toml
@@ -49,6 +51,9 @@ jobs:
           apps/platform/tests/test_data_engineering.py
           apps/platform/tests/test_data_identity.py
           --junitxml=data-test-results.xml
+      - name: Run Web data integration tests
+        working-directory: apps/web-backend
+        run: python manage.py test defect.test_data_engineering --verbosity 1
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

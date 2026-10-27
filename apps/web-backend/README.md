@@ -6,7 +6,7 @@ YOLO 模型训练、测试集评估、模型推理和图片/视频识别。
 ## 页面模块
 
 1. 项目介绍：平台能力、工作流与技术架构。
-2. 数据理解：数据划分、类别分布、样本图片和质检查询。
+2. 数据理解：选择数据集、构建流水线、实时进度、16 项质检明细、历史报告对比和下载。
 3. 模型训练：网页启动训练、实时进度/日志、指标图表、数据验证和测试集评估。
 4. 模型推理：单图推理和目标框坐标检查。
 5. 仪表盘：检测记录、识别次数、目标数量和最近活动。
@@ -52,12 +52,57 @@ python manage.py createsuperuser
 训练结束后，最新完整运行记录会自动显示；取消的任务不会覆盖已完成模型指标。
 正式训练建议使用 GPU 和 50–100 个 epoch。
 
+## 数据工程网页操作
+
+打开 `http://127.0.0.1:8000/?module=understanding`，在“数据理解”的数据工程工作台操作：
+
+1. 选择本机数据集；没有真实数据时页面显示缺失提示，图片数量按当前磁盘统计。
+2. 展开“流水线与质检配置”，设置格式、检测/分割、划分策略、种子、比例和类别顺序。
+3. 点击“构建数据集”并确认，后台调用 D3。原始数据保留，成品数据按参数重建。
+4. 点击“运行 16 项质检”，后台调用 D4；可自动对比上次、指定基线或关闭对比。
+5. 查看实际阶段进度、处理数量、速度和预计剩余时间；刷新页面后会继续查询当前任务。
+6. 在“质检明细与历史对比”按级别筛选，展开检查项查看坏图、标签行或 SHA256 证据，
+   切换历史报告，下载 JSON、结果 CSV 和对比 CSV。
+
+进度百分比表示**当前阶段**的完成量，进入新阶段会重新计数。质检发现 ERROR / WARNING
+时任务仍会正常完成并保存报告，页面显示检查结论与证据；只有执行异常才显示任务失败。
+Web 数据任务日志及状态位于 `runs/web_data/`，质检报告仍位于 `runs/data_validation/`。
+同一开发服务同时只执行一个数据任务；构建数据和模型训练的按钮会互相检查运行状态。
+
+仓库自带 YAML 可能保留其他电脑的绝对路径。请在本机准备 `data/raw/<名称>/images`
+及对应标注目录后，从页面重建成品及 YAML；仅有配置时不会显示原电脑的历史图片数量。
+
+开发验证（全部使用隔离临时数据，不改动真实数据集）：
+
+```powershell
+python -m pip install -r apps/web-backend/requirements.txt -r requirements-data-dev.txt
+cd apps/web-backend
+python manage.py test defect
+```
+
+可选浏览器验证，在仓库根执行：
+
+```powershell
+python -m pip install playwright
+# 使用本机 Edge / Chrome；无本机浏览器时先执行 python -m playwright install chromium
+python scripts/check_data_web.py --output-dir runs/web_data_smoke
+```
+
+浏览器测试对数据工程 API 使用真实后端和子进程，只为无关的模型、识别和训练查询提供
+测试响应；验证进度、16 项结果、坏图修复、基线、下载与手机布局，并保存截图。
+
 ## 核心 API
 
 | 方法 | 地址 | 用途 |
 |---|---|---|
-| GET | `/api/data/` | 数据统计、类别、样本和质检 |
-| POST | `/api/data/validate/` | 重新执行数据验证 |
+| GET | `/api/data/?dataset=<名称>` | 当前数据集实际统计、类别、样本和质检 |
+| GET | `/api/data/catalog/` | 本机数据集、原始数据/成品可用性及默认参数 |
+| POST | `/api/data/transform/` | 后台构建数据集，立即返回 202 |
+| POST | `/api/data/validate/` | 后台执行 16 项质检，立即返回 202 |
+| GET | `/api/data/jobs/` | 当前后台数据任务、阶段实际进度、速度、剩余时间及日志 |
+| GET | `/api/data/reports/?dataset=<名称>` | 当前配置与任务的最近 30 份有效质检报告 |
+| GET | `/api/data/reports/<run_id>/?dataset=<名称>` | 逐项结果、错误证据、历史对比和下载链接 |
+| GET | `/api/data/reports/<run_id>/download/<文件名>/?dataset=<名称>` | 下载 report.json、results.csv 或 comparison.csv |
 | GET/POST | `/api/training/` | 查询状态或启动训练 |
 | POST | `/api/training/cancel/` | 停止训练 |
 | GET | `/api/model/` | 最新模型、历史指标和评估结果 |
