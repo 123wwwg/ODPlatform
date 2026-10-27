@@ -335,6 +335,12 @@
                     </div>
                     <label class="range-label"><span>置信度阈值</span><b>{{ Math.round(inferenceConfidence*100) }}%</b></label>
                     <input v-model.number="inferenceConfidence" type="range" min="0.05" max="0.9" step="0.05" class="range">
+                    <div class="check-group">
+                        <span class="check-group-title">标注显示</span>
+                        <label class="check-item"><input type="checkbox" v-model="displayOptions.showLabel"><span>类别标签</span></label>
+                        <label class="check-item" :class="{ muted: !displayOptions.showLabel }"><input type="checkbox" v-model="displayOptions.showConfidence" :disabled="!displayOptions.showLabel"><span>置信度</span></label>
+                        <label class="check-item"><input type="checkbox" v-model="displayOptions.showLegend"><span>类别图例</span></label>
+                    </div>
                     <div class="control-actions">
                         <button class="primary" @click="runInference" :disabled="inferenceLoading || !inferenceFile">{{ inferenceLoading ? "推理中..." : "运行模型推理" }}</button>
                         <button class="secondary" v-if="inferencePreview" @click="clearInference">清除</button>
@@ -405,6 +411,12 @@
                     </div>
                     <label class="range-label"><span>置信度阈值</span><b>{{ Math.round(mediaConfidence*100) }}%</b></label>
                     <input v-model.number="mediaConfidence" type="range" min="0.05" max="0.9" step="0.05" class="range">
+                    <div class="check-group">
+                        <span class="check-group-title">标注显示</span>
+                        <label class="check-item"><input type="checkbox" v-model="displayOptions.showLabel"><span>类别标签</span></label>
+                        <label class="check-item" :class="{ muted: !displayOptions.showLabel }"><input type="checkbox" v-model="displayOptions.showConfidence" :disabled="!displayOptions.showLabel"><span>置信度</span></label>
+                        <label class="check-item"><input type="checkbox" v-model="displayOptions.showLegend"><span>类别图例</span></label>
+                    </div>
                     <div class="control-actions"><button class="primary" @click="runMediaRecognition" :disabled="mediaLoading || !mediaFile">{{ mediaLoading ? "识别中..." : "开始图片识别" }}</button><button class="secondary" v-if="mediaImagePreview" @click="clearMedia">清除</button></div>
                     <p class="error-text" v-if="mediaError">{{ mediaError }}</p>
                 </div>

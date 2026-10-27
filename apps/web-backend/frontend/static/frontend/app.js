@@ -127,6 +127,18 @@ createApp({
         const inferenceLoading = ref(false);
         const inferenceError = ref("");
 
+        // 标注图显示开关: 勾选框状态直接决定后端画什么
+        const displayOptions = reactive({
+            showLabel: true,
+            showConfidence: true,
+            showLegend: true,
+        });
+        const displayOptionFields = () => ({
+            show_label: String(displayOptions.showLabel),
+            show_confidence: String(displayOptions.showConfidence),
+            show_legend: String(displayOptions.showLegend),
+        });
+
         const requestedMediaTab = new URLSearchParams(window.location.search).get("tab");
         const mediaTab = ref(requestedMediaTab === "video" ? "video" : "image");
         const mediaFile = ref(null);
@@ -423,6 +435,7 @@ createApp({
             data.append("image", inferenceFile.value);
             data.append("confidence", inferenceConfidence.value);
             data.append("iou", "0.7");
+            Object.entries(displayOptionFields()).forEach(([key, value]) => data.append(key, value));
             try {
                 const response = await axios.post(`${API}/recognition/`, data, { timeout: 120000 });
                 inferenceResult.value = response.data;
@@ -463,6 +476,7 @@ createApp({
             data.append("image", mediaFile.value);
             data.append("confidence", mediaConfidence.value);
             data.append("iou", "0.7");
+            Object.entries(displayOptionFields()).forEach(([key, value]) => data.append(key, value));
             try {
                 const response = await axios.post(`${API}/recognition/`, data, { timeout: 120000 });
                 mediaResult.value = response.data;
@@ -608,6 +622,7 @@ createApp({
             inferenceConfidence,
             inferenceLoading,
             inferenceError,
+            displayOptions,
             mediaTab,
             mediaFile,
             mediaVideoFile,

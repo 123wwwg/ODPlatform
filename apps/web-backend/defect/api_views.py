@@ -59,6 +59,17 @@ class DefectRecordViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+def _as_bool(value, default: bool = True) -> bool:
+    """把前端提交的 "true"/"false"/1/0 等统一转成 bool."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _defect_stats_payload() -> dict:
     records = DefectRecord.objects.all()
     today = timezone.localdate()
@@ -238,7 +249,18 @@ def recognition_records(request):
     try:
         confidence = float(request.data.get("confidence", 0.25))
         iou = float(request.data.get("iou", 0.7))
-        result = recognize_image_file(image, confidence=confidence, iou=iou)
+        # 可视化显示开关: 前端以 "true"/"false" 字符串提交, 这里统一成 bool
+        show_label = _as_bool(request.data.get("show_label", True))
+        show_confidence = _as_bool(request.data.get("show_confidence", True))
+        show_legend = _as_bool(request.data.get("show_legend", True))
+        result = recognize_image_file(
+            image,
+            confidence=confidence,
+            iou=iou,
+            show_label=show_label,
+            show_confidence=show_confidence,
+            show_legend=show_legend,
+        )
     except (ValueError, FileNotFoundError) as exc:
         return Response({"detail": str(exc)}, status=400)
     except Exception as exc:

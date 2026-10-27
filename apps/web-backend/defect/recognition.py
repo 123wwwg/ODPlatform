@@ -49,6 +49,9 @@ def recognize_image_file(
     *,
     confidence: float = 0.25,
     iou: float = 0.7,
+    show_label: bool = True,
+    show_confidence: bool = True,
+    show_legend: bool = True,
 ) -> dict[str, Any]:
     import numpy as np
     from PIL import Image, ImageOps, UnidentifiedImageError
@@ -128,7 +131,12 @@ def recognize_image_file(
         )
         for item in detections
     ]
-    style = DrawStyle.from_image_size(*bgr_image.shape[:2], show_legend=True)
+    style = DrawStyle.from_image_size(
+        *bgr_image.shape[:2],
+        show_label=show_label,
+        show_confidence=show_confidence,
+        show_legend=show_legend,
+    )
     annotated_bgr = visualizer.draw(bgr_image, dets, style=style)
 
     annotated_rgb = annotated_bgr[:, :, ::-1]
