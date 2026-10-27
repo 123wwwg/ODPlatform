@@ -1,5 +1,32 @@
 from __future__ import annotations
 
+from defect.api_views import (
+    DefectRecordViewSet,
+    DefectTypeViewSet,
+    dashboard_overview,
+    dashboard_stats,
+    model_evaluation,
+    model_evaluation_artifact,
+    model_overview,
+    recognition_record_detail,
+    recognition_records,
+    training_cancel,
+    training_control,
+    training_curve,
+    video_recognition_detail,
+    video_recognition_records,
+)
+from defect.data_api import (
+    catalog,
+    dataset_overview,
+    dataset_sample,
+    job_status,
+    report_detail,
+    report_download,
+    reports,
+    transform_dataset,
+    validate_dataset,
+)
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -8,25 +35,6 @@ from django.views.static import serve
 from rest_framework.routers import DefaultRouter
 
 from config.views import frontend_index
-from defect.api_views import (
-    DefectRecordViewSet,
-    DefectTypeViewSet,
-    dashboard_overview,
-    dashboard_stats,
-    dataset_overview,
-    dataset_sample,
-    model_overview,
-    model_evaluation,
-    model_evaluation_artifact,
-    recognition_record_detail,
-    recognition_records,
-    training_cancel,
-    training_control,
-    training_curve,
-    validate_dataset,
-    video_recognition_detail,
-    video_recognition_records,
-)
 
 router = DefaultRouter()
 router.register("defect-type", DefectTypeViewSet, basename="defect-type")
@@ -39,6 +47,16 @@ urlpatterns = [
     path("api/dashboard/", dashboard_overview, name="dashboard-overview"),
     path("api/data/", dataset_overview, name="dataset-overview"),
     path("api/data/validate/", validate_dataset, name="dataset-validate"),
+    path("api/data/catalog/", catalog, name="data-catalog"),
+    path("api/data/transform/", transform_dataset, name="data-transform"),
+    path("api/data/jobs/", job_status, name="data-job-status"),
+    path("api/data/reports/", reports, name="data-reports"),
+    path("api/data/reports/<str:run_id>/", report_detail, name="data-report-detail"),
+    path(
+        "api/data/reports/<str:run_id>/download/<str:filename>/",
+        report_download,
+        name="data-report-download",
+    ),
     path(
         "api/data/sample/<str:split>/<str:filename>",
         dataset_sample,

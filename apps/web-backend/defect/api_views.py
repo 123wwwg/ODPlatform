@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import subprocess
-import sys
 from collections import Counter
 from pathlib import Path
 from uuid import uuid4
 
 from django.core.files.base import ContentFile
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import filters, permissions, viewsets
@@ -15,19 +13,18 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
+from .data_jobs import data_jobs
 from .data_understanding import (
-    DATASET_YAML,
-    dataset_sample_path,
     get_dataset_understanding,
 )
 from .evaluation import evaluation_artifact, latest_evaluation, run_test_evaluation
+from .model_info import get_model_overview, latest_training_curve
 from .models import (
     DefectRecord,
     DefectType,
     RecognitionRecord,
     VideoRecognitionRecord,
 )
-from .model_info import get_model_overview, latest_training_curve
 from .recognition import recognize_image_file
 from .serializers import (
     DefectRecordSerializer,
@@ -78,10 +75,7 @@ def _defect_stats_payload() -> dict:
         "high_confidence": records.filter(confidence__gte=0.8).count(),
         "total_types": DefectType.objects.count(),
         "average_confidence": round(
-            (
-                sum(records.values_list("confidence", flat=True))
-                / max(records.count(), 1)
-            ),
+            (sum(records.values_list("confidence", flat=True)) / max(records.count(), 1)),
             3,
         ),
         "type_counts": list(type_counts),
@@ -106,59 +100,13 @@ def training_curve(request):
     return FileResponse(curve.open("rb"), content_type="image/png")
 
 
-@api_view(["GET"])
-def dataset_overview(request):
-    return Response(get_dataset_understanding())
-
-
-@api_view(["GET"])
-def dataset_sample(request, split: str, filename: str):
-    sample = dataset_sample_path(split, filename)
-    if sample is None:
-        return Response({"detail": "样本图片不存在。"}, status=404)
-    content_type = "image/jpeg"
-    if sample.suffix.lower() == ".png":
-        content_type = "image/png"
-    return FileResponse(sample.open("rb"), content_type=content_type)
-
-
-@api_view(["POST"])
-def validate_dataset(request):
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "od_platform.cli.validate_data",
-            str(DATASET_YAML),
-        ],
-        cwd=str(DATASET_YAML.parents[4]),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=120,
-    )
-    details = get_dataset_understanding()
-    return Response(
-        {
-            "success": result.returncode == 0,
-            "exit_code": result.returncode,
-            "validation": details.get("validation", {}),
-            "summary": (
-                "数据验证通过"
-                if result.returncode == 0
-                else "数据验证未通过，请查看命令行日志"
-            ),
-            "output_tail": "\n".join(result.stdout.splitlines()[-20:]),
-        },
-        status=200 if result.returncode == 0 else 422,
-    )
-
-
 @api_view(["GET", "POST"])
 def training_control(request):
     if request.method == "GET":
         return Response(training_jobs.status())
+    data_job = data_jobs.status()
+    if data_job.get("status") == "running" and data_job.get("action") == "transform":
+        return Response({"detail": "数据集正在重新构建，完成后再启动训练。"}, status=409)
     current = training_jobs.status()
     if current.get("status") == "running":
         return Response({"detail": "已有训练任务正在运行。"}, status=409)

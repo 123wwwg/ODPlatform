@@ -117,7 +117,6 @@ createApp({
         });
         const trainingForm = reactive({ epochs: 1, imgsz: 416, batch: 16, device: "cpu" });
         const trainingError = ref("");
-        const validatingData = ref(false);
         const evaluatingModel = ref(false);
         let trainingPollTimer = null;
 
@@ -268,6 +267,9 @@ createApp({
             return Object.entries(data).map(([key, value]) => `${key}: ${value}`).join("；");
         };
 
+        const dataTools = useDataEngineering({ dataset, refreshOverview: () => loadAll(false), showToast, getError });
+        const validatingData = dataTools.validatingData;
+
         const scheduleTrainingPoll = (delay = 1200) => {
             if (trainingPollTimer) window.clearTimeout(trainingPollTimer);
             trainingPollTimer = window.setTimeout(pollTraining, delay);
@@ -299,14 +301,14 @@ createApp({
                     trainingResponse,
                 ] = await Promise.all([
                     axios.get(`${API}/dashboard/`),
-                    axios.get(`${API}/data/`),
+                    axios.get(`${API}/data/`, { params: { dataset: dataTools.selectedDataset.value } }),
                     axios.get(`${API}/model/`),
                     axios.get(`${API}/recognition/`),
                     axios.get(`${API}/video-recognition/`),
                     axios.get(`${API}/training/`),
                 ]);
                 Object.assign(dashboard, dashboardResponse.data);
-                Object.assign(dataset, datasetResponse.data);
+                if (datasetResponse.data.name === dataTools.selectedDataset.value) Object.assign(dataset, datasetResponse.data);
                 Object.assign(modelInfo, modelResponse.data);
                 recognitionHistory.value = recognitionResponse.data;
                 videoHistory.value = videoResponse.data;
@@ -328,7 +330,7 @@ createApp({
             }
         };
         const refreshAll = async () => {
-            await loadAll();
+            await Promise.all([loadAll(), dataTools.refreshDataEngineering()]);
             showToast("数据已刷新");
         };
 
@@ -359,18 +361,7 @@ createApp({
                 showToast(getError(error), "error");
             }
         };
-        const validateDataset = async () => {
-            validatingData.value = true;
-            try {
-                const response = await axios.post(`${API}/data/validate/`);
-                showToast(response.data.summary || "数据验证完成");
-                await loadAll(false);
-            } catch (error) {
-                showToast(getError(error), "error");
-            } finally {
-                validatingData.value = false;
-            }
-        };
+        const validateDataset = dataTools.validateDataset;
         const evaluateModel = async () => {
             evaluatingModel.value = true;
             try {
@@ -578,14 +569,16 @@ createApp({
             }
         };
 
-        onMounted(loadAll);
+        onMounted(async () => { await dataTools.initialize(); await loadAll(); });
         onBeforeUnmount(() => {
+            dataTools.dispose();
             if (trainingPollTimer) window.clearTimeout(trainingPollTimer);
             if (toast.timer) window.clearTimeout(toast.timer);
             [inferencePreview, mediaImagePreview, mediaVideoPreview].forEach((item) => releaseUrl(item.value));
         });
 
         return {
+            ...dataTools,
             modules,
             activeModule,
             currentModule,

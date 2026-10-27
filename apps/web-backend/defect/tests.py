@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -30,6 +32,22 @@ def make_test_image() -> SimpleUploadedFile:
 
 class DefectApiTests(TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="odp_web_api_test_")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        media = override_settings(MEDIA_ROOT=root / "media")
+        media.enable()
+        self.addCleanup(media.disable)
+        model = root / "models/pretrained/yolov8n.pt"
+        model.parent.mkdir(parents=True)
+        model.write_bytes(b"mocked training weight")
+        for key, value in {
+            "PROJECT_ROOT": root,
+            "WEB_TRAINING_RUNS": root / "runs/web_training",
+        }.items():
+            substitution = patch(f"defect.training_jobs.{key}", value)
+            substitution.start()
+            self.addCleanup(substitution.stop)
         self.client = APIClient()
         self.defect_type, _ = DefectType.objects.get_or_create(
             type_name="测试划痕",
@@ -151,7 +169,9 @@ class DefectApiTests(TestCase):
         self.assertIn("detail", response.data)
 
     def test_dataset_and_dashboard_endpoints(self):
-        dataset = self.client.get("/api/data/")
+        sample = {"name": "Rubbish_data_set", "class_count": 10, "total_images": 30}
+        with patch("defect.data_api.get_dataset_understanding", return_value=sample):
+            dataset = self.client.get("/api/data/")
         self.assertEqual(dataset.status_code, 200)
         self.assertEqual(dataset.data["class_count"], 10)
         self.assertGreater(dataset.data["total_images"], 0)

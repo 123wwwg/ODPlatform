@@ -88,22 +88,97 @@
         </section>
 
         <section class="module" v-show="activeModule === 'understanding'">
+            <div class="section-card data-workbench">
+                <div class="section-head data-toolbar">
+                    <div><h2>数据工程工作台</h2><p>构建数据集、查看实时进度，并追踪每次质检的问题变化。</p></div>
+                    <label class="field dataset-select">当前数据集
+                        <select v-model="selectedDataset" @change="selectDataset" :disabled="dataBusy" aria-label="当前数据集">
+                            <option v-for="item in datasetOptions" :key="item.name" :value="item.name">{{ item.name }}</option>
+                            <option v-if="!datasetOptions.length" :value="selectedDataset">暂无本地数据集</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="data-actions">
+                    <button class="secondary" @click="transformDataset" :disabled="dataBusy || trainingRunning || !currentDataset?.has_raw">构建数据集</button>
+                    <button class="primary" @click="validateDataset" :disabled="dataBusy || !currentDataset?.has_config">{{ validatingData ? '正在质检…' : '运行 16 项质检' }}</button>
+                    <span class="hint" v-if="currentDataset">{{ currentDataset.task === 'segment' ? '分割任务' : '检测任务' }} · {{ currentDataset.format.toUpperCase() }} · 固定种子 {{ transformForm.seed }}</span>
+                </div>
+                <p v-if="!currentDataset?.has_raw" class="data-notice">本机尚无该数据集的原始图片，准备好原始数据后即可构建。</p>
+                <p v-if="dataset.message" class="data-notice">{{ dataset.message }}</p>
+                <details class="data-settings">
+                    <summary>流水线与质检配置</summary>
+                    <div class="two-grid">
+                        <div>
+                            <h3>流水线参数</h3>
+                            <div class="field-pair">
+                                <label class="field">原始标注格式<select v-model="transformForm.format" :disabled="dataBusy"><option value="yolo">YOLO</option><option value="pascal_voc">Pascal VOC</option><option value="coco">COCO</option></select></label>
+                                <label class="field">任务类型<select v-model="transformForm.task" :disabled="dataBusy"><option value="detect">目标检测</option><option value="segment">实例分割</option></select></label>
+                                <label class="field">划分策略<select v-model="transformForm.split_strategy" :disabled="dataBusy"><option value="random">随机划分</option><option value="stratified_multilabel">多标签分层划分</option></select></label>
+                                <label class="field">随机种子<input type="number" min="0" step="1" v-model="transformForm.seed" :disabled="dataBusy"></label>
+                                <label class="field">训练集比例<input type="number" min="0.01" max="1" step="0.01" v-model="transformForm.train_rate" :disabled="dataBusy"></label>
+                                <label class="field">验证集比例<input type="number" min="0" max="0.99" step="0.01" v-model="transformForm.val_rate" :disabled="dataBusy"></label>
+                            </div>
+                            <label class="field">类别名称（按类别 ID 顺序，以逗号分隔）<textarea rows="2" v-model="transformForm.classes" :disabled="dataBusy" placeholder="YOLO 必填，例如：纸张, 塑料, 金属"></textarea></label>
+                            <p class="hint">测试集比例自动取剩余部分。构建会更新成品数据，原始数据保留。</p>
+                        </div>
+                        <div>
+                            <h3>历史对比</h3>
+                            <label class="field">对比方式<select aria-label="对比方式" v-model="compareMode" :disabled="dataBusy"><option value="auto">自动对比最近一次有效报告</option><option value="specific">选择历史基线</option><option value="off">本次不进行对比</option></select></label>
+                            <label v-if="compareMode === 'specific'" class="field">历史基线<select aria-label="历史基线" v-model="baselineRunId" :disabled="dataBusy"><option value="">请选择历史报告</option><option v-for="item in reportHistory.filter(row => row.baseline_compatible)" :key="item.run_id" :value="item.run_id">{{ item.run_id }} · {{ item.severity }}</option></select></label>
+                            <p class="hint">对比仅使用相同数据配置、数据根目录和任务的报告。首跑会建立基线；缺少数据身份的旧版报告仍可查看。</p>
+                            <p class="hint">质检覆盖图片能否解码、标签结构、归一化坐标、类别 ID 范围、目标框边界和样本 SHA256 等 16 项检查。</p>
+                        </div>
+                    </div>
+                </details>
+                <p v-if="dataError" class="error-text data-error" role="alert">{{ dataError }}</p>
+                <p v-if="pollWarning" class="data-notice" role="status">{{ pollWarning }}</p>
+            </div>
+            <div v-if="dataJob.status !== 'idle'" class="section-card data-task" :class="{ 'task-failed': dataJob.status === 'failed' }" aria-live="polite">
+                <div class="section-head">
+                    <div><span class="eyebrow">{{ dataJob.action === 'transform' ? '数据流水线' : '数据质检' }} · {{ dataJob.dataset }}</span><h2>{{ dataStageLabel }}</h2><p>{{ dataJob.status === 'running' ? '当前阶段的实际完成量；进入下一阶段时进度重新计数。' : dataJob.status === 'completed' ? '任务已完成，结果已保存。' : dataJob.error }}</p></div>
+                    <strong class="data-percentage">{{ dataJob.progress === null ? '处理中' : `${Math.round(dataJob.progress || 0)}%` }}</strong>
+                </div>
+                <div class="progress" role="progressbar" :aria-label="dataStageLabel" :aria-valuenow="dataJob.progress ?? undefined" aria-valuemin="0" aria-valuemax="100"><i :class="{ indeterminate: dataJob.progress === null }" :style="{ width: `${dataJob.progress ?? 25}%` }"></i></div>
+                <div v-if="dataJob.progress_event" class="data-progress-meta"><span>{{ formatNumber(dataJob.progress_event.completed) }} / {{ dataJob.progress_event.total === null ? '未知总量' : formatNumber(dataJob.progress_event.total) }} 项</span><span>{{ dataJob.progress_event.rate }} 项/秒</span><span>{{ dataJob.progress_event.eta_seconds === null ? '正在计算剩余时间' : `预计剩余 ${dataJob.progress_event.eta_seconds} 秒` }}</span></div>
+                <details v-if="dataJob.logs?.length" class="task-log"><summary>查看任务日志</summary><pre class="console">{{ dataJob.logs.join('\n') }}</pre></details>
+            </div>
+            <div class="section-card quality-report">
+                <div class="section-head data-report-head">
+                    <div><h2>质检明细与历史对比</h2><p>每次检查都有结论和证据，坏图或标签问题可直接定位。</p></div>
+                    <label class="field report-select">查看报告<select aria-label="查看报告" v-model="selectedReportId" @change="loadReport" :disabled="reportLoading"><option value="">暂无质检报告</option><option v-for="item in reportHistory" :key="item.run_id" :value="item.run_id">{{ item.run_id }} · {{ item.severity }}</option></select></label>
+                </div>
+                <div v-if="reportLoading" class="empty-line">正在读取质检报告…</div>
+                <div v-else-if="!validationReport" class="module-empty small-empty"><b>还没有当前数据集的质检报告</b><span>点击“运行 16 项质检”，完成后在这里查看逐项结果。</span></div>
+                <template v-else>
+                    <div class="quality-summary"><span class="quality-badge" :class="severityClass(validationReport.severity)">{{ validationReport.severity }}</span><span>{{ validationReport.results.length }} 项检查 · {{ validationReport.duration_seconds }} 秒</span><div class="report-downloads"><a v-if="validationReport.downloads?.json" :href="validationReport.downloads.json">下载 JSON</a><a v-if="validationReport.downloads?.csv" :href="validationReport.downloads.csv">下载 CSV</a><a v-if="validationReport.downloads?.comparison" :href="validationReport.downloads.comparison">下载对比 CSV</a></div></div>
+                    <div v-if="validationReport.comparison" class="quality-comparison">
+                        <p>对比基线：<b>{{ validationReport.comparison.baseline_run_id }}</b><span class="hint"> · 按质检项对比</span></p>
+                        <div class="comparison-stats"><div v-for="group in comparisonGroups" :key="group.key" :class="severityClass(group.tone)"><b>{{ group.rows.length }}</b><span>{{ group.label }}</span></div></div>
+                        <details v-for="group in comparisonGroups.filter(item => item.rows.length)" :key="group.key" class="comparison-group"><summary>{{ group.label }}（{{ group.rows.length }}）</summary><div v-for="item in group.rows" :key="item.check" class="comparison-row"><b>{{ checkLabel(item.check) }}</b><span>{{ item.previous?.severity || '未检查' }} → {{ item.current.severity }}</span><p>{{ item.current.summary }}</p></div></details>
+                        <p v-if="validationReport.comparison.added_checks?.length || validationReport.comparison.removed_checks?.length" class="hint">新增检查：{{ validationReport.comparison.added_checks.map(checkLabel).join('、') || '无' }}；移除检查：{{ validationReport.comparison.removed_checks.map(checkLabel).join('、') || '无' }}。移除检查不计为问题修复。</p>
+                    </div>
+                    <p v-else class="data-notice">本报告没有历史对比。首次质检、关闭对比或旧版报告都会出现此状态。</p>
+                    <div class="quality-filters" aria-label="按质检级别筛选"><button :class="{ active: severityFilter === 'all' }" @click="severityFilter = 'all'">全部 {{ validationReport.results.length }}</button><button v-for="level in ['ERROR', 'WARNING', 'INFO', 'PASS']" :key="level" :class="[severityClass(level), { active: severityFilter === level }]" @click="severityFilter = level">{{ level }} {{ checkCounts[level] }}</button></div>
+                    <div class="quality-checks"><details v-for="item in checks" :key="selectedReportId + item.name" class="quality-check"><summary><span class="quality-badge" :class="severityClass(item.severity)">{{ item.severity }}</span><b>{{ checkLabel(item.name) }}</b><span class="check-summary">{{ item.summary }}</span></summary><div class="check-evidence"><p>问题明细与检查依据</p><pre>{{ prettyEvidence(item.details) }}</pre></div></details><p v-if="!checks.length" class="empty-line">本次没有此级别的检查结果。</p></div>
+                </template>
+            </div>
+
             <div class="section-card">
                 <div class="section-head">
-                    <div><h2>Rubbish_data_set 数据概览</h2><p>数据划分、类别分布和标注质量。</p></div>
-                    <button class="primary small" @click="validateDataset" :disabled="validatingData">
+                    <div><h2>{{ selectedDataset }} 数据概览</h2><p>数据划分、类别分布和标注质量。</p></div>
+                    <button class="primary small" @click="validateDataset" :disabled="dataBusy || !currentDataset?.has_config">
                         {{ validatingData ? "正在验证..." : "重新验证数据" }}
                     </button>
                 </div>
                 <div class="kpi-grid four compact">
-                    <article class="kpi"><span>有效图片</span><b>{{ formatNumber(dataset.total_images) }}</b><small>全部有标签</small></article>
+                    <article class="kpi"><span>图片数量</span><b>{{ formatNumber(dataset.total_images) }}</b><small>当前目录实际图片数量</small></article>
                     <article class="kpi"><span>目标框</span><b>{{ formatNumber(dataset.total_boxes) }}</b><small>检测实例总数</small></article>
                     <article class="kpi"><span>类别数</span><b>{{ dataset.class_count || 0 }}</b><small>{{ (dataset.classes || []).join(" · ") }}</small></article>
-                    <article class="kpi"><span>质检结论</span><b class="success-text">{{ dataset.validation?.severity || "—" }}</b><small>{{ dataset.strategy || "固定划分" }}</small></article>
+                    <article class="kpi"><span>质检结论</span><b :class="severityClass(dataset.validation?.severity)">{{ dataset.validation?.severity || "—" }}</b><small>{{ dataset.strategy || "固定划分" }}</small></article>
                 </div>
                 <div class="two-grid">
                     <article class="chart-card">
-                        <div class="chart-title"><div><h3>数据划分</h3><p>固定种子 {{ dataset.seed || "—" }} 生成，用于可重复训练。</p></div></div>
+                        <div class="chart-title"><div><h3>数据划分</h3><p>固定种子 {{ dataset.seed ?? "—" }} 生成，用于可重复训练。</p></div></div>
                         <div class="split-visual">
                             <div class="donut" :style="{ background: splitGradient }"><span>{{ formatNumber(dataset.total_images) }}<small>图片</small></span></div>
                             <div class="legend">
@@ -114,7 +189,7 @@
                         </div>
                     </article>
                     <article class="chart-card">
-                        <div class="chart-title"><div><h3>类别实例分布</h3><p>每个类别框数量接近均衡，避免模型偏向单一类别。</p></div></div>
+                        <div class="chart-title"><div><h3>类别实例分布</h3><p>比较各类别实例数量，识别样本不足与长尾分布。</p></div></div>
                         <div class="bar-chart">
                             <div v-for="item in classRows" :key="item.label" class="bar-row">
                                 <span>{{ item.label }}</span><i><em :style="{ width: barPercent(item.count, classRows) }"></em></i><b>{{ item.count }}</b>
@@ -140,7 +215,7 @@
                 <div class="pipeline">
                     <div><b>RAW</b><span>原始 YOLO 图片与标签</span></div><i>→</i>
                     <div><b>TRANSFORM</b><span>格式校验、固定划分、物化</span></div><i>→</i>
-                    <div><b>VALIDATE</b><span>15 项质量检查</span></div><i>→</i>
+                    <div><b>VALIDATE</b><span>16 项质量检查（含图片解码）</span></div><i>→</i>
                     <div><b>READY</b><span>可重复训练的数据集 YAML</span></div>
                 </div>
             </div>
@@ -372,6 +447,7 @@
 <noscript>ODPlatform 需要启用 JavaScript。</noscript>
 <script src="/assets/vendor/vue.global.prod.js"></script>
 <script src="/assets/vendor/axios.min.js"></script>
+<script src="/assets/data-engineering.js"></script>
 <script src="/assets/app.js"></script>
 </body>
 </html>
