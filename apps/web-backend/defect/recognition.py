@@ -104,7 +104,33 @@ def recognize_image_file(
             )
             class_counts[label] += 1
 
-    annotated_bgr = result.plot(labels=True, conf=True, line_width=2)
+    # 用平台自己的可视化模块出图: 类别自动配色 + 右上角图例
+    from od_platform.visualization import BeautifyVisualizer, Detection, DrawStyle
+
+    palette = [
+        (56, 56, 255), (151, 157, 255), (31, 112, 255), (29, 178, 255),
+        (49, 210, 207), (10, 249, 72), (23, 204, 146), (134, 219, 61),
+        (52, 147, 26), (187, 212, 0), (168, 153, 44), (255, 194, 0),
+    ]
+    color_mapping = {
+        str(name): palette[i % len(palette)]
+        for i, name in enumerate(names.values())
+    }
+    visualizer = BeautifyVisualizer(
+        labels=[str(v) for v in names.values()],
+        color_mapping=color_mapping,
+    )
+    dets = [
+        Detection(
+            xyxy=tuple(item["bbox"]),
+            confidence=float(item["confidence"]),
+            label=str(item["label"]),
+        )
+        for item in detections
+    ]
+    style = DrawStyle.from_image_size(*bgr_image.shape[:2], show_legend=True)
+    annotated_bgr = visualizer.draw(bgr_image, dets, style=style)
+
     annotated_rgb = annotated_bgr[:, :, ::-1]
     annotated_image = Image.fromarray(annotated_rgb.astype(np.uint8))
 
